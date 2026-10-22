@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "System Vitals",
+    "description": "Live CPU load, CPU temperature, memory, disk and upload/download throughput in the composer tool row."
+  }
+}

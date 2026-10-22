@@ -1,0 +1,7 @@
+# dsh-system-vitals 的配置层，由 dsh.bundle manifest 引用。
+# Host 半侧每秒采样 /proc 与 /sys，Client 半侧在输入框下方渲染状态细条。
+- insert:
+    - id: system-vitals
+      name: dsh-system-vitals
+      config:
+        intervalMs: 1000

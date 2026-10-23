@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 2026-10-23
+
+### Fixed
+
+- The strip no longer pushes the composer's native controls onto a second line.
+  The host control row is `flex-wrap: wrap` and measures itself
+  (`observeControlRow`) to pick its compact mode, counting the strip's width; the
+  trailing cluster is `flex: none`, so an uncapped strip forced a wrap that
+  moved the permission and submit controls. The strip is now capped against the
+  row's own width (`100cqw` minus a 250px reserve for the host controls) and its
+  cells wrap inside that cap, so it always yields instead of displacing them.
+
 ## [1.3.1] - 2026-10-23
 
 ### Fixed

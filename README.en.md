@@ -107,9 +107,16 @@ Preferences live in `localStorage` (`dsh-system-vitals:visible` / `:order`) and 
 ## Placement and wrapping
 
 The strip registers in `conversation.input.right`, inside the `.trailing` flex cluster with
-the submit button. The host row is `flex-wrap: wrap` with `.tools` and `.trailing` as
-siblings: a strip inside `.tools` stayed on the first line while the submit button wrapped to
-the second, which read as the strip jumping upward. In `.trailing` the two always wrap together.
+the submit button.
+
+The host row is `flex-wrap: wrap` and measures itself (`observeControlRow`) to decide whether
+the model seat goes compact — **the strip's width counts toward that measurement**, while
+`.trailing` is `flex: none`. An uncapped strip therefore forced the row to wrap, pushing the
+permission and submit controls away. The strip is capped at `100cqw - 250px` (the row width
+minus the space the host controls need) and wraps its own cells beyond that: it always yields,
+and the native buttons keep their place. The 250px reserve comes from the controls on that row —
+`+`(28) + permission (~110) + compact model seat (24) + submit (34) + three 12px gaps — which
+keeps every row from 320px up on a single line.
 
 ## Configuration
 

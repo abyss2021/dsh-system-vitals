@@ -92,9 +92,15 @@ Host 每秒采样一次，Client 每 2 秒轮询 `GET /system-vitals/api/snapsho
 
 ## 位置与换行
 
-细条挂在 `conversation.input.right`，位于 `.trailing` 组内、与发送按钮同一 flex 组。宿主那行是
-`flex-wrap: wrap`，`.tools` 与 `.trailing` 为同级子项——若把细条放进 `.tools`，窄窗口下发送按钮会换到
-第二行而细条留在第一行，看起来就像"细条往上跳"。放在 `.trailing` 里，两者始终一起换行。
+细条挂在 `conversation.input.right`，位于 `.trailing` 组内、与发送按钮同一 flex 组。
+
+宿主那行是 `flex-wrap: wrap`，并且用 `observeControlRow` 量自身宽度来决定模型选择器是否紧凑——
+**细条的宽度被算进这一行**，而 `.trailing` 是 `flex: none`，所以细条若不肯让步，整行就会被挤到换行，
+把「完全权限」和发送按钮推走。因此细条用 `100cqw - 250px`（按行宽扣掉宿主控件所需空间）封顶，
+超出的部分在**自己内部换行**：它永远是让步的那一方，原生按钮位置不变。
+
+250px 的预留来自那一行上的宿主控件实测：`+`(28) + 权限控件(~110) + 紧凑模型位(24) + 发送按钮(34)
++ 三个 12px 间距；在这个预留下，320px 宽的行以上都能保持单行。
 
 ## 配置
 

@@ -85,10 +85,35 @@ window.__ModuleLoader__.load({
 
     const STYLES = `
 /* One rigid cell for the composer tool row: 4ch label + 3ch number + 3ch unit. */
-.smx-root{box-sizing:border-box;display:flex;align-items:center;justify-content:flex-start;gap:10px;
-  flex:0 1 auto;min-width:0;overflow:hidden;white-space:nowrap;
+/* The composer control row is a flex-wrap row whose trailing cluster is
+   flex: none, and the host measures that row (observeControlRow) to decide its
+   own compact mode. A strip that cannot yield therefore forces the row to wrap,
+   which moves the native controls onto a line of their own. Two rules keep the
+   row intact instead:
+     1. cap the strip against the row's width (cqw resolves against the row,
+        which declares container-type: inline-size), reserving the space the
+        host controls need; and
+     2. let the cells wrap inside that cap, so a narrow row shows the same
+        readings over two lines instead of clipping a value mid-unit.
+   The reserve covers the left tool cluster (add + permission), the model
+   selector and the submit button; the host's own observeControlRow then
+   compacts the model selector when the row is still tight. Nothing about the
+   visible set or its order depends on the width, so resizing can never
+   reorder, hide or unpin a reading.
+
+   The 250px reserve is measured from the host controls on that row: the add
+   button (28) + permission control (~110) + the compact model seat (24) + the
+   submit button (34) + the three 12px row gaps. With it, the row fits on one
+   line from a 320px row upward, so the native controls never get pushed to a
+   second line. The cqw unit is supported by every browser the Harness Web UI
+   targets (Chrome 105+, Safari 16+, Firefox 110+). */
+.smx-root{box-sizing:border-box;display:flex;align-items:center;justify-content:flex-start;
+  gap:6px 10px;flex-wrap:wrap;overflow:hidden;
+  flex:0 1 auto;min-width:0;
+  max-width:max(0px, calc(100cqw - var(--sv-row-reserve, 250px)));
   color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:18px;font-variant-numeric:tabular-nums}
 .smx-item{display:inline-flex;align-items:baseline;gap:3px;flex:none;width:calc(10ch + 6px);
+  white-space:nowrap;
   border-radius:4px;cursor:grab;user-select:none;transition:background-color .12s ease,box-shadow .12s ease}
 .smx-item:hover{background:var(--dsw-alias-interactive-bg-hover)}
 .smx-item:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}

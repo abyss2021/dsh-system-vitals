@@ -114,9 +114,15 @@ the model seat goes compact — **the strip's width counts toward that measureme
 `.trailing` is `flex: none`. An uncapped strip therefore forced the row to wrap, pushing the
 permission and submit controls away. The strip is capped at `100cqw - 250px` (the row width
 minus the space the host controls need) and wraps its own cells beyond that: it always yields,
-and the native buttons keep their place. The 260px reserve comes from the controls on that row —
-`+`(28) + permission (~118) + compact model seat (24) + submit (34) + three 12px gaps — which
-keeps every row from 320px up on a single line (8px of slack in the worst case).
+and the native buttons keep their place. The cap is measured at runtime rather than hardcoded: a `ResizeObserver` reads the row width,
+subtracts every control outside the strip's own ancestor branch plus the gaps, and keeps a 4px
+safety margin. The model seat counts at its compact width (24px), because the host collapses it
+to an icon when space runs short — planning for its expanded label starved the strip and then
+prevented the host from ever compacting.
+
+Measured behaviour (row / cap / visible readings / host result): 396px→104px→1→single line;
+500px→208px→2→single line; 620px→328px→4→single line; 900px→482px→6→single line;
+1100px→482px→6→single line.
 
 The strip is always **one line**: when it does not fit it clips at the right edge, so the
 **leading** readings survive — the head of your own order — and a 12px gradient hides the cut.

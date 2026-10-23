@@ -90,9 +90,10 @@ window.__ModuleLoader__.load({
    own compact mode. A strip that cannot yield therefore forces the row to wrap,
    which moves the native controls onto a line of their own. Two rules keep the
    row intact instead:
-     1. cap the strip against the row's width (cqw resolves against the row,
-        which declares container-type: inline-size), reserving the space the
-        host controls need; and
+     1. cap the strip against the width actually left over on that row, measured
+        in JS from the sibling controls (a container-unit cap was silently
+        dropped by the host page, so the strip kept its full width and forced
+        the wrap); and
      2. keep the strip on exactly ONE line, clipping at its right edge, so the
         row's height never changes. Wrapping the cells onto two lines grew the
         strip's height, and because the trailing cluster centres its items that
@@ -101,18 +102,18 @@ window.__ModuleLoader__.load({
    leftmost cells — the beginning of the user's own order — always survive.
    A short gradient masks the cut so no value is seen half-drawn.
 
-   The 260px reserve is measured from the host controls on that row: the add
-   button (28) + the permission cluster (~118) + the compact model seat (24) +
-   the submit button (34) + the three 12px row gaps. Verified numerically: with
-   it the row keeps a single line from a 320px row upward (8px of slack at the
-   worst case), so neither the strip nor the native controls ever wrap. Below
-   roughly 400px of row width only one to two readings survive the cap; that is
-   the intended trade-off — the leading readings win over wrapping. The cqw unit is supported by every browser the Harness Web UI
+   The cap is recomputed whenever that row resizes: it is the row's content width
+   minus every control outside the strip's own branch, minus the gaps between
+   them, minus a 4px safety margin. Measuring the real controls keeps the reserve
+   correct when the model seat switches between its full label and the compact
+   icon, which is exactly when a fixed reserve would be wrong. Below roughly
+   400px of row width only one to two readings survive the cap; that is the
+   intended trade-off — the leading readings win over wrapping. The cqw unit is supported by every browser the Harness Web UI
    targets (Chrome 105+, Safari 16+, Firefox 110+). */
 .smx-root{box-sizing:border-box;display:flex;align-items:center;justify-content:flex-start;
   gap:10px;flex-wrap:nowrap;overflow:hidden;
   flex:0 1 auto;min-width:0;
-  max-width:max(0px, calc(100cqw - var(--sv-row-reserve, 260px)));
+  max-width:100%;
   -webkit-mask-image:linear-gradient(to right, #000 calc(100% - 12px), transparent 100%);
   mask-image:linear-gradient(to right, #000 calc(100% - 12px), transparent 100%);
   color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:18px;font-variant-numeric:tabular-nums}
@@ -391,22 +392,93 @@ window.__ModuleLoader__.load({
 
     /* ---------------------------------------------------------------- strip */
 
+    /** The nearest ancestor that declares itself an inline-size container. */
+    function findContainer(element) {
+      let node = element?.parentElement ?? null
+      while (node !== null) {
+        const type = typeof window.getComputedStyle === 'function'
+          ? window.getComputedStyle(node).containerType
+          : ''
+        if (type && type !== 'normal') return node
+        node = node.parentElement
+      }
+      return null
+    }
+
+    /**
+     * Width the strip may occupy: the container's content width minus every
+     * control outside the strip's own ancestor branch, the gaps between them and
+     * a 4px safety margin. Excluding our own branch is what keeps this stable —
+     * the strip's own width never feeds back into the measurement.
+     */
+    function measureAvailable(element) {
+      const container = findContainer(element)
+      if (container === null) return null
+      const branch = new Set()
+      for (let node = element; node !== null && node !== container; node = node.parentElement) branch.add(node)
+
+      let used = 0
+      let count = 0
+      for (const child of container.children) {
+        if (branch.has(child)) continue
+        used += child.getBoundingClientRect().width
+        count += 1
+      }
+      // Siblings beside us on the way up to the container: the model seat and the
+      // submit button. The model seat's contribution is capped at the compact
+      // seat width because the host compacts it whenever the row runs out of
+      // space; planning for its expanded label would starve the strip and then
+      // stop the host from ever compacting.
+      for (let node = element; node !== null && node !== container; node = node.parentElement) {
+        const parent = node.parentElement
+        if (parent === null || parent === container) continue
+        for (const sibling of parent.children) {
+          if (sibling === node || branch.has(sibling)) continue
+          used += Math.min(sibling.getBoundingClientRect().width, 60)
+          count += 1
+        }
+      }
+
+      const style = typeof window.getComputedStyle === 'function' ? window.getComputedStyle(container) : null
+      const gap = style === null ? 0 : Number.parseFloat(style.columnGap) || 0
+      const available = container.clientWidth - used - count * gap - 4
+      return Math.max(0, Math.floor(available))
+    }
+
     function MetricsBar(props) {
       const t = typeof props.t === 'function' ? props.t : (key) => key
       const { snapshot, failed } = useSnapshot()
       const { order, visible } = usePreferences()
       const [selected, setSelected] = useState(null)
       const [dragging, setDragging] = useState(null)
+      const [cap, setCap] = useState(null)
+      const rootRef = useRef(null)
       // Slot index being dragged, kept in a ref so drag handlers always read the
       // newest value without waiting for a re-render.
       const dragFrom = useRef(null)
+
+      useEffect(() => {
+        const element = rootRef.current
+        if (element === null) return undefined
+        const measure = () => {
+          const available = measureAvailable(element)
+          if (available !== null) setCap(available)
+        }
+        measure()
+        if (typeof ResizeObserver !== 'function') return undefined
+        const observer = new ResizeObserver(measure)
+        const container = findContainer(element)
+        if (container !== null) observer.observe(container)
+        observer.observe(element)
+        return () => observer.disconnect()
+      }, [])
 
       const now = snapshot && snapshot.now ? snapshot.now : null
 
       if (now === null) {
         return h(
           'div',
-          { className: 'smx-root' },
+          { ref: rootRef, className: 'smx-root' },
           h('style', null, STYLES),
           h('span', { className: 'smx-wait' }, failed ? t('unavailable') : t('waiting')),
         )
@@ -483,7 +555,13 @@ window.__ModuleLoader__.load({
 
       return h(
         'div',
-        { className: 'smx-root', role: 'list', 'aria-label': t('reorderHint') },
+        {
+          ref: rootRef,
+          className: 'smx-root',
+          role: 'list',
+          'aria-label': t('reorderHint'),
+          style: cap === null ? undefined : { maxWidth: `${cap}px` },
+        },
         h('style', null, STYLES),
         cells,
       )

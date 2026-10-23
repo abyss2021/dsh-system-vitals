@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.4] - 2026-10-23
+
+### Fixed
+
+- The width cap now actually applies. The container-unit version
+  (`calc(100cqw - 260px)`) was dropped by the host page, so the strip kept its
+  full width and the composer row still wrapped. The cap is now measured in JS:
+  the row's content width minus every control outside the strip's own ancestor
+  branch, the gaps, and a 4px safety margin, recomputed on resize.
+- The model seat's contribution is planned at its compact width (24px), because
+  the host compacts it when the row runs out of space. Planning for its expanded
+  label starved the strip and then stopped the host from ever compacting.
+
 ## [1.3.3] - 2026-10-23
 
 ### Fixed

@@ -12,17 +12,26 @@
  * unit is rescaled (B/s → K/s → M/s) instead of widening the cell. The strip
  * must stay content-sized: giving it inline-size containment inside the
  * content-sized tool cluster collapses it to zero width.
+ *
+ * Interaction: a cell can be selected (click, Enter or Space) and dragged to a
+ * new slot, or moved with the arrow keys while focused. Cells are equal width
+ * and stay in the flex row with no placeholder, so reordering never changes the
+ * strip's own width or position — only which reading occupies which slot.
  */
 window.__ModuleLoader__.load({
   id: 'dsh-system-vitals',
   factory(require) {
     const React = require('react')
     const h = React.createElement
-    const { useEffect, useState } = React
+    const { useCallback, useEffect, useRef, useState } = React
 
     const NS = 'dsh-system-vitals'
     const ENDPOINT = '/system-vitals/api/snapshot'
     const POLL_MS = 2000
+    const STORAGE_KEY = 'dsh-system-vitals:order'
+
+    /** Slot order and the identity of every metric; also the restore fallback. */
+    const DEFAULT_ORDER = ['cpu', 'temperature', 'mem', 'disk', 'upload', 'download']
 
     const zh = {
       cpu: 'CPU',
@@ -33,6 +42,7 @@ window.__ModuleLoader__.load({
       download: '下载',
       waiting: '采样中…',
       unavailable: '不可用',
+      reorderHint: '拖动或用左右方向键调整顺序',
     }
 
     const en = {
@@ -44,17 +54,20 @@ window.__ModuleLoader__.load({
       download: 'DOWN',
       waiting: 'sampling…',
       unavailable: 'n/a',
+      reorderHint: 'Drag or use the arrow keys to reorder',
     }
 
     const STYLES = `
-/* One rigid cell for the composer tool row: 4ch label + 3.5ch number + 2.5ch unit. */
+/* One rigid cell for the composer tool row: 4ch label + 3ch number + 3ch unit. */
 .smx-root{box-sizing:border-box;display:flex;align-items:center;justify-content:flex-start;gap:10px;
   flex:0 1 auto;min-width:0;overflow:hidden;
   color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:18px;font-variant-numeric:tabular-nums}
-/* Cells total 10ch so the strip keeps its width: label 4ch, value 3ch, unit 3ch.
-   The unit cell must fit three characters such as K/s and M/s, so the value
-   cell gives up the half character instead of clipping a trailing s. */
-.smx-item{display:inline-flex;align-items:baseline;gap:3px;flex:none;width:calc(10ch + 6px)}
+.smx-item{display:inline-flex;align-items:baseline;gap:3px;flex:none;width:calc(10ch + 6px);
+  border-radius:4px;cursor:grab;user-select:none;transition:background-color .12s ease,box-shadow .12s ease}
+.smx-item:hover{background:var(--dsw-alias-interactive-bg-hover)}
+.smx-item:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}
+.smx-item[data-selected="true"]{box-shadow:inset 0 0 0 1px var(--dsw-alias-brand-primary)}
+.smx-item[data-dragging="true"]{cursor:grabbing;opacity:.55}
 .smx-key{flex:none;width:4ch;overflow:hidden;text-align:right;color:var(--dsw-alias-label-tertiary)}
 .smx-val{flex:none;width:3ch;text-align:right;color:var(--dsw-alias-label-secondary);font-weight:500}
 .smx-unit{flex:none;width:3ch;text-align:left;white-space:nowrap;color:var(--dsw-alias-label-tertiary)}
@@ -118,6 +131,29 @@ window.__ModuleLoader__.load({
       return 'var(--dsw-alias-label-secondary)'
     }
 
+    /** Stored order, reconciled against the metrics this build knows. */
+    function readOrder() {
+      try {
+        const raw = window.localStorage.getItem(STORAGE_KEY)
+        if (raw === null) return DEFAULT_ORDER
+        const parsed = JSON.parse(raw)
+        if (!Array.isArray(parsed)) return DEFAULT_ORDER
+        const known = parsed.filter((id) => DEFAULT_ORDER.includes(id))
+        const missing = DEFAULT_ORDER.filter((id) => !known.includes(id))
+        return [...new Set(known), ...missing]
+      } catch {
+        return DEFAULT_ORDER
+      }
+    }
+
+    function moveSlot(order, from, to) {
+      if (from === to || from < 0 || to < 0 || from >= order.length || to >= order.length) return order
+      const next = [...order]
+      const [moved] = next.splice(from, 1)
+      next.splice(to, 0, moved)
+      return next
+    }
+
     function useSnapshot() {
       const [snapshot, setSnapshot] = useState(null)
       const [failed, setFailed] = useState(false)
@@ -150,75 +186,155 @@ window.__ModuleLoader__.load({
       return { snapshot, failed }
     }
 
-    /** One cell; `title` carries the exact reading a compact cell cannot show. */
-    function Item({ label, reading, color, title, priority = 1 }) {
-      return h(
-        'span',
-        { className: 'smx-item', title, 'data-priority': priority },
-        h('span', { className: 'smx-key' }, label),
-        h('span', { className: 'smx-val', style: color === undefined ? undefined : { color } }, reading.number),
-        h('span', { className: 'smx-unit' }, reading.unit),
-      )
-    }
-
     function MetricsBar(props) {
       const t = typeof props.t === 'function' ? props.t : (key) => key
       const { snapshot, failed } = useSnapshot()
+      const [order, setOrder] = useState(readOrder)
+      const [selected, setSelected] = useState(null)
+      const [dragging, setDragging] = useState(null)
+      // Slot index being dragged, kept in a ref so drag handlers always read the
+      // newest value without waiting for a re-render.
+      const dragFrom = useRef(null)
+
+      const persist = useCallback((next) => {
+        setOrder(next)
+        try {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+        } catch {
+          /* A blocked localStorage keeps the order for this session only. */
+        }
+      }, [])
+
       const now = snapshot && snapshot.now ? snapshot.now : null
+      const cpuPercent = now && now.cpu ? now.cpu.percent : null
+      const memory = now ? now.mem ?? null : null
+      const disk = now ? now.disk ?? null : null
+      const net = now ? now.net ?? null : null
 
-      if (now === null) {
-        return h('div', { className: 'smx-root' }, h('style', null, STYLES), h('span', { className: 'smx-wait' }, failed ? t('unavailable') : t('waiting')))
-      }
-
-      const cpuPercent = now.cpu ? now.cpu.percent : null
-      const memory = now.mem ?? null
-      const disk = now.disk ?? null
-      const net = now.net ?? null
-
-      return h(
-        'div',
-        { className: 'smx-root' },
-        h('style', null, STYLES),
-        h(Item, {
+      /** Everything the renderer needs per metric, keyed by slot id. */
+      const metrics = {
+        cpu: {
           label: t('cpu'),
           reading: splitPercent(cpuPercent),
           color: tone(cpuPercent, 75, 90),
           title: `CPU ${Number.isFinite(cpuPercent) ? Math.round(cpuPercent * 10) / 10 : '—'}%`,
           priority: 1,
-        }),
-        h(Item, {
+        },
+        temperature: {
           label: t('temperature'),
-          reading: splitTemperature(now.temperature),
-          color: tone(now.temperature, 80, 92),
-          title: Number.isFinite(now.temperature) ? `${now.temperature}°C` : undefined,
+          reading: splitTemperature(now ? now.temperature : Number.NaN),
+          color: tone(now ? now.temperature : Number.NaN, 80, 92),
+          title: now && Number.isFinite(now.temperature) ? `${now.temperature}°C` : undefined,
           priority: 1,
-        }),
-        h(Item, {
+        },
+        mem: {
           label: t('mem'),
-          reading: splitPercent(memory?.percent),
-          color: tone(memory?.percent, 80, 92),
+          reading: splitPercent(memory ? memory.percent : Number.NaN),
+          color: tone(memory ? memory.percent : Number.NaN, 80, 92),
           title: memory ? `${formatGiB(memory.used)}G / ${formatGiB(memory.total)}G` : undefined,
           priority: 1,
-        }),
-        h(Item, {
+        },
+        disk: {
           label: t('disk'),
-          reading: splitPercent(disk?.percent),
-          color: tone(disk?.percent, 85, 95),
+          reading: splitPercent(disk ? disk.percent : Number.NaN),
+          color: tone(disk ? disk.percent : Number.NaN, 85, 95),
           title: disk ? `${formatGiB(disk.used)}G / ${formatGiB(disk.total)}G` : undefined,
           priority: 2,
-        }),
-        h(Item, {
+        },
+        upload: {
           label: t('upload'),
           reading: splitRate(net ? net.tx : Number.NaN),
           title: net ? `${Math.round(net.tx / 1024)} KB/s` : undefined,
           priority: 3,
-        }),
-        h(Item, {
+        },
+        download: {
           label: t('download'),
           reading: splitRate(net ? net.rx : Number.NaN),
           title: net ? `${Math.round(net.rx / 1024)} KB/s` : undefined,
           priority: 3,
-        }),
+        },
+      }
+
+      if (now === null) {
+        return h(
+          'div',
+          { className: 'smx-root' },
+          h('style', null, STYLES),
+          h('span', { className: 'smx-wait' }, failed ? t('unavailable') : t('waiting')),
+        )
+      }
+
+      const cells = order.map((id, index) => {
+        const metric = metrics[id]
+        if (metric === undefined) return null
+        const label = metric.title === undefined ? metric.label : `${metric.label} · ${metric.title}`
+        return h(
+          'span',
+          {
+            key: id,
+            className: 'smx-item',
+            draggable: true,
+            tabIndex: 0,
+            role: 'listitem',
+            'data-priority': metric.priority,
+            'data-selected': selected === id,
+            'data-dragging': dragging === id,
+            'aria-label': `${metric.label} ${metric.reading.number}${metric.reading.unit} — ${t('reorderHint')}`,
+            title: label,
+            onDragStart: (event) => {
+              // Keep the composer's own file-drop handling out of this drag.
+              event.stopPropagation()
+              dragFrom.current = index
+              setDragging(id)
+              event.dataTransfer.effectAllowed = 'move'
+              event.dataTransfer.setData('text/plain', id)
+            },
+            // Reorder live while dragging: the dragged metric takes the hovered
+            // slot immediately, so the drop point is never in doubt.
+            onDragOver: (event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              event.dataTransfer.dropEffect = 'move'
+              const from = dragFrom.current
+              if (from === null || from === index) return
+              dragFrom.current = index
+              persist(moveSlot(order, from, index))
+            },
+            onDrop: (event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              dragFrom.current = null
+              setDragging(null)
+            },
+            onDragEnd: () => {
+              dragFrom.current = null
+              setDragging(null)
+            },
+            onClick: () => setSelected((current) => (current === id ? null : id)),
+            onKeyDown: (event) => {
+              if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+                event.preventDefault()
+                const to = event.key === 'ArrowLeft' ? index - 1 : index + 1
+                if (to < 0 || to >= order.length) return
+                persist(moveSlot(order, index, to))
+                setSelected(id)
+              } else if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                setSelected((current) => (current === id ? null : id))
+              }
+            },
+          },
+          h('span', { className: 'smx-key' }, metric.label),
+          h('span', { className: 'smx-val', style: metric.color === undefined ? undefined : { color: metric.color } }, metric.reading.number),
+          h('span', { className: 'smx-unit' }, metric.reading.unit),
+        )
+      })
+
+      return h(
+        'div',
+        { className: 'smx-root', role: 'list', 'aria-label': t('reorderHint') },
+        h('style', null, STYLES),
+        cells,
       )
     }
 

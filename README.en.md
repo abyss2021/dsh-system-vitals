@@ -73,6 +73,20 @@ Anything a platform cannot read is returned as `null` and rendered as `—`; no 
 - **Windows**: one long-lived PowerShell child streams one JSON line per second (the performance counters already report percentages and per-second byte rates, so no deltas are needed). If the child exits it restarts after a five-second backoff and the last sample is reused meanwhile.
 - Any other platform falls back to a minimal Node-only reading (memory, load, uptime); CPU load and throughput render `—`.
 
+## Reordering
+
+Every reading is an independently selectable cell:
+
+- **Drag** a reading to another slot; slots swap live while dragging and the order is
+  committed on drop.
+- **Keyboard**: focus a cell with Tab and move it with `←` / `→` (`Enter` / `Space` selects).
+- **Persistence**: the order is stored in `localStorage` under `dsh-system-vitals:order` and
+  survives reloads. Ids this build no longer knows are dropped, and missing readings are
+  appended back.
+
+Cells are equal width and dragging leaves **no placeholder**, so the strip's width and
+absolute position are identical in every order — only which reading occupies which slot changes.
+
 ## Narrow windows
 
 The composer tool row is already an inline-size container, and the plugin queries it

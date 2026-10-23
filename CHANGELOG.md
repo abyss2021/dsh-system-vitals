@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-10-23
+
+### Added
+
+- Reorder the readings: each cell is selectable, draggable into another slot, and
+  movable with the arrow keys while focused. Slots swap live during a drag and
+  the order is committed on drop; drag events do not reach the composer's own
+  file-drop handling.
+- The order persists in `localStorage` (`dsh-system-vitals:order`), reconciled
+  against the metrics the build knows so a stale id is dropped and a missing
+  reading is appended back.
+- Cells are equal width and dragging leaves no placeholder, so the strip's width
+  and absolute position are unchanged in every order.
+
 ## [1.1.0] - 2026-10-23
 
 ### Added

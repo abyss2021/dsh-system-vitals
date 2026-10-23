@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.7] - 2026-10-23
+
+### Fixed
+
+- The width cap is finally measured against the right numbers. The diagnostics
+  showed `available 486 > natural 442` — the cap never bound — because the model
+  seat reports 0 width from its own element while occupying ~200px. The cap now
+  subtracts the **branch residual** (the strip's own ancestor row width minus the
+  strip) instead of summing leaf children, capped at 90px so the host still
+  collapses the model seat when the row is tight.
+
 ## [1.3.6] - 2026-10-23
 
 ### Changed

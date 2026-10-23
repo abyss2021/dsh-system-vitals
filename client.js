@@ -408,10 +408,17 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * Width the strip may occupy: the container's content width minus every
-     * control outside the strip's own ancestor branch, the gaps between them and
-     * a 4px safety margin. Excluding our own branch is what keeps this stable —
-     * the strip's own width never feeds back into the measurement.
+     * Width the strip may occupy on the composer row.
+     *
+     * Measured from the row, not from the strip: subtract every sibling on the
+     * row (the tool cluster) and everything in the strip's own ancestor branch
+     * except the strip itself. Leaf-level measuring failed here — the model seat
+     * reports 0 width from its own element while occupying ~200px — so the
+     * branch residual (its real width minus ours) is what gets subtracted.
+     *
+     * The residual is capped at 90px: the host collapses the model seat to an
+     * icon when the row runs out of room, so planning for its expanded label
+     * would starve the strip and then stop the host from ever collapsing it.
      */
     function measureAvailable(element) {
       const container = findContainer(element)
@@ -419,44 +426,39 @@ window.__ModuleLoader__.load({
       const branch = new Set()
       for (let node = element; node !== null && node !== container; node = node.parentElement) branch.add(node)
 
+      const selfWidth = element.getBoundingClientRect().width
       let used = 0
       let count = 0
-      const siblings = []
+      const parts = []
       for (const child of container.children) {
-        if (branch.has(child)) continue
         const width = child.getBoundingClientRect().width
+        if (branch.has(child)) {
+          // Our own branch: subtract everything but the strip itself.
+          const residual = Math.max(0, width - selfWidth)
+          const counted = Math.min(residual, 90)
+          used += counted
+          count += 1
+          parts.push({ where: 'branch', tag: tagOf(child), w: Math.round(width), residual: Math.round(residual), counted: Math.round(counted) })
+          continue
+        }
         used += width
         count += 1
-        siblings.push({ where: 'row', tag: tagOf(child), w: Math.round(width) })
-      }
-      // Siblings beside us on the way up to the container: the model seat and the
-      // submit button. The model seat's contribution is capped at the compact
-      // seat width because the host compacts it whenever the row runs out of
-      // space; planning for its expanded label would starve the strip and then
-      // stop the host from ever compacting.
-      for (let node = element; node !== null && node !== container; node = node.parentElement) {
-        const parent = node.parentElement
-        if (parent === null || parent === container) continue
-        for (const sibling of parent.children) {
-          if (sibling === node || branch.has(sibling)) continue
-          const width = sibling.getBoundingClientRect().width
-          used += Math.min(width, 60)
-          count += 1
-          siblings.push({ where: tagOf(parent), tag: tagOf(sibling), w: Math.round(width), counted: Math.round(Math.min(width, 60)) })
-        }
+        parts.push({ where: 'row', tag: tagOf(child), w: Math.round(width), counted: Math.round(width) })
       }
 
       const style = typeof window.getComputedStyle === 'function' ? window.getComputedStyle(container) : null
       const gap = style === null ? 0 : Number.parseFloat(style.columnGap) || 0
-      const available = container.clientWidth - used - count * gap - 4
+      const gaps = Math.max(0, count - 1) * gap
+      const safety = 8
+      const available = container.clientWidth - used - gaps - safety
       return {
         available: Math.max(0, Math.floor(available)),
         row: container.clientWidth,
         used: Math.round(used),
-        gaps: Math.round(count * gap + 4),
+        gaps: Math.round(gaps + safety),
         gap,
         count,
-        siblings,
+        siblings: parts,
         tag: tagOf(container),
       }
     }

@@ -136,7 +136,8 @@ font and the host version): 396px→1→single line; 500px→2→single line; 62
 900px and above→6→single line.
 
 The strip is always **one line**: when it does not fit it clips at the right edge, so the
-**leading** readings survive — the head of your own order — and a 12px gradient hides the cut.
+**leading** readings survive — the head of your own order. The cap snaps to whole cells, so
+the cut always falls between two readings: no partial value, and no fade at the end either.
 
 > Trade-off: below roughly 400px of row width only one or two readings fit once the host
 > controls are accounted for. That is what "one line, keep the left ones" costs. If you would

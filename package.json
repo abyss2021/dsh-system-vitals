@@ -1,6 +1,6 @@
 {
   "name": "dsh-system-vitals",
-  "version": "1.3.11",
+  "version": "1.3.12",
   "description": "Live CPU, CPU temperature, memory, disk and upload/download throughput inside the DeepSeek Harness composer tool row. Linux, macOS and Windows.",
   "type": "module",
   "license": "MIT",

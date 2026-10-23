@@ -36,7 +36,7 @@ window.__ModuleLoader__.load({
     const ORDER_KEY = 'dsh-system-vitals:order'
     const VISIBLE_KEY = 'dsh-system-vitals:visible'
     /** Reported by the layout diagnostics so a stale bundle is obvious. */
-    const VERSION = '1.3.11'
+    const VERSION = '1.3.12'
 
     /** Slot order and the identity of every metric; also the restore fallback. */
     const DEFAULT_ORDER = ['cpu', 'temperature', 'mem', 'disk', 'upload', 'download']
@@ -108,7 +108,9 @@ window.__ModuleLoader__.load({
         shifted the native controls vertically on every resize.
    Clipping means the readings at the right edge lose their room first, so the
    leftmost cells — the beginning of the user's own order — always survive.
-   A short gradient masks the cut so no value is seen half-drawn.
+   The cap snaps to whole cells, so the cut always falls between two readings
+   and no value is ever seen half-drawn; the strip used to end in a 12px
+   gradient to hide a partial cell, which only faded the last visible reading.
 
    The cap is recomputed whenever that row resizes: it is the row's content width
    minus every control outside the strip's own branch, minus the gaps between
@@ -121,8 +123,6 @@ window.__ModuleLoader__.load({
   gap:10px;flex-wrap:nowrap;overflow:hidden;
   flex:0 1 auto;min-width:0;
   max-width:100%;
-  -webkit-mask-image:linear-gradient(to right, #000 calc(100% - 12px), transparent 100%);
-  mask-image:linear-gradient(to right, #000 calc(100% - 12px), transparent 100%);
   color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:18px;font-variant-numeric:tabular-nums}
 .smx-item{display:inline-flex;align-items:baseline;gap:3px;flex:none;width:calc(10ch + 6px);
   white-space:nowrap;

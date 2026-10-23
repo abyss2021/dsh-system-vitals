@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.12] - 2026-10-23
+
+### Removed
+
+- The 12px fade at the strip's right edge. It existed to hide a partially
+  clipped reading, but the width cap snaps to whole cells, so the cut never
+  lands inside a value — the gradient only faded the last visible reading.
+  Measured at ten viewport widths from 1400px down to 480px: no partially
+  visible cell at any of them, so plain clipping shows every reading intact.
+
 ## [1.3.11] - 2026-10-23
 
 Verified against the live Web UI in headless Chromium, sweeping the viewport

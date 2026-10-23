@@ -28,10 +28,13 @@
 要求：DSH `0.2.1-rc.2` 左右版本、Node ≥ 20、`dsh web` 带界面的 profile。
 
 ```bash
-# 1. 从 GitHub 安装
+# 1. 从 npm 安装（已发布后可用）
+dsh plugin --profile web add dsh-system-vitals
+
+# 2. 或直接从 GitHub 安装（不依赖 npm 发布）
 dsh plugin --profile web add github:abyss2021/dsh-system-vitals
 
-# 2. 或从本地目录安装（开发调试）
+# 3. 或从本地目录安装（开发调试）
 dsh plugin --profile web add /path/to/dsh-system-vitals
 ```
 
@@ -125,13 +128,19 @@ dsh-system-vitals/
 └── README.md / README.en.md / LICENSE
 ```
 
-## 开发
+## 开发与发布
 
 ```bash
-node --check index.js      # 语法检查
+node --check index.js                       # 语法检查
 node --check client.js
-npm pack --dry-run         # 查看将发布的文件列表
+for file in platform/*.js; do node --check "$file"; done
+npm pack --dry-run                          # 查看将发布的文件列表
+npm publish                                 # 发布到 npm（需先 npm login）
 ```
+
+发布前记得同步升版本（`npm version patch|minor|major`）并更新 `CHANGELOG.md`。
+`package.json` 已声明 `publishConfig.access = public` 与 `provenance`；若在 CI 里发布并希望生成
+来源证明，用 `npm publish --provenance`（需 GitHub Actions 的 OIDC 环境）。
 
 修改后重装即可生效：
 

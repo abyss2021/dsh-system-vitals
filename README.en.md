@@ -34,7 +34,10 @@ exactly where you type.
 Requires DSH around `0.2.1-rc.2`, Node ≥ 20, and a profile with the Web UI (`dsh web`).
 
 ```bash
-# from GitHub
+# from npm (once published)
+dsh plugin --profile web add dsh-system-vitals
+
+# or straight from GitHub, no npm release needed
 dsh plugin --profile web add github:abyss2021/dsh-system-vitals
 
 # or from a local checkout
@@ -139,13 +142,17 @@ dsh-system-vitals/
 └── README.md / README.en.md / LICENSE
 ```
 
-## Development
+## Development and publishing
 
 ```bash
 node --check index.js
 node --check client.js
+for file in platform/*.js; do node --check "$file"; done
 npm pack --dry-run
+npm publish
 ```
+
+Bump the version (`npm version patch|minor|major`) and update `CHANGELOG.md` before publishing.
 
 Reinstall after changes:
 

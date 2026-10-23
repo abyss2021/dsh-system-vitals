@@ -4,6 +4,15 @@
   "description": "Live CPU, CPU temperature, memory, disk and upload/download throughput inside the DeepSeek Harness composer tool row. Linux, macOS and Windows.",
   "type": "module",
   "license": "MIT",
+  "author": "abyss2021",
+  "homepage": "https://github.com/abyss2021/dsh-system-vitals#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abyss2021/dsh-system-vitals.git"
+  },
+  "bugs": {
+    "url": "https://github.com/abyss2021/dsh-system-vitals/issues"
+  },
   "keywords": [
     "dsh",
     "dsh-plugin",
@@ -38,6 +47,10 @@
     "CHANGELOG.md",
     "LICENSE"
   ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"

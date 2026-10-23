@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- npm publishing metadata (`author`, `homepage`, `repository`, `bugs`,
+  `publishConfig`) plus a `Publish` GitHub Actions workflow that checks the
+  release tag against `package.json` and publishes with provenance.
+
 - Reorder the readings: each cell is selectable, draggable into another slot, and
   movable with the arrow keys while focused. Slots swap live during a drag and
   the order is committed on drop; drag events do not reach the composer's own

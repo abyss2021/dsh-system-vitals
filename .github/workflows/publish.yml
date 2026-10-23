@@ -1,0 +1,44 @@
+name: Publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Verify the release tag matches package.json
+        if: github.event_name == 'release'
+        run: |
+          node -e '
+            const pkg = require("./package.json");
+            const tag = process.env.TAG.replace(/^v/, "");
+            if (pkg.version !== tag) {
+              throw new Error(`package.json ${pkg.version} does not match tag ${tag}`);
+            }
+          '
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+
+      - name: Syntax check
+        run: |
+          node --check index.js
+          node --check client.js
+          for file in platform/*.js; do node --check "$file"; done
+
+      - name: Publish
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

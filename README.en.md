@@ -43,7 +43,7 @@ From a local checkout: `dsh plugin --profile web add /path/to/dsh-system-vitals`
 > Keep the two commands out of the same code block: the plugin-store install detector
 > treats two executable candidates as `ambiguous` and then shows none.  
 
-Refresh the page afterwards. Uninstall:
+Refresh the page afterwards. Release notes live in GitHub Releases (first one: `v1.3.12`). Uninstall:
 
 ```bash
 dsh plugin --profile web remove dsh-system-vitals

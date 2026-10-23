@@ -37,7 +37,7 @@ dsh plugin --profile web add github:abyss2021/dsh-system-vitals
 > 这两条命令**不要同时写进代码块**：插件商店的安装命令探测器遇到两个候选会判为
 > `ambiguous`，反而一条都不显示。
 
-装好后刷新页面即可。卸载：
+装好后刷新页面即可。版本发布记录见 GitHub Releases（首个版本 `v1.3.12`）。卸载：
 
 ```bash
 dsh plugin --profile web remove dsh-system-vitals

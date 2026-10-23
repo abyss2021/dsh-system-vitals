@@ -34,15 +34,14 @@ exactly where you type.
 Requires DSH around `0.2.1-rc.2`, Node ≥ 20, and a profile with the Web UI (`dsh web`).
 
 ```bash
-# from npm (once published)
-dsh plugin --profile web add dsh-system-vitals
-
-# or straight from GitHub, no npm release needed
 dsh plugin --profile web add github:abyss2021/dsh-system-vitals
-
-# or from a local checkout
-dsh plugin --profile web add /path/to/dsh-system-vitals
 ```
+
+From a local checkout: `dsh plugin --profile web add /path/to/dsh-system-vitals`.
+
+> Once an npm release exists, `dsh plugin --profile web add dsh-system-vitals` also works.
+> Keep the two commands out of the same code block: the plugin-store install detector
+> treats two executable candidates as `ambiguous` and then shows none.  
 
 Refresh the page afterwards. Uninstall:
 

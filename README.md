@@ -28,15 +28,14 @@
 要求：DSH `0.2.1-rc.2` 左右版本、Node ≥ 20、`dsh web` 带界面的 profile。
 
 ```bash
-# 1. 从 npm 安装（已发布后可用）
-dsh plugin --profile web add dsh-system-vitals
-
-# 2. 或直接从 GitHub 安装（不依赖 npm 发布）
 dsh plugin --profile web add github:abyss2021/dsh-system-vitals
-
-# 3. 或从本地目录安装（开发调试）
-dsh plugin --profile web add /path/to/dsh-system-vitals
 ```
+
+也可以从本地目录安装（开发调试）：`dsh plugin --profile web add /path/to/dsh-system-vitals`。
+
+> 若将来发布到 npm，可用 `dsh plugin --profile web add dsh-system-vitals` 安装。
+> 这两条命令**不要同时写进代码块**：插件商店的安装命令探测器遇到两个候选会判为
+> `ambiguous`，反而一条都不显示。
 
 装好后刷新页面即可。卸载：
 
@@ -135,12 +134,15 @@ node --check index.js                       # 语法检查
 node --check client.js
 for file in platform/*.js; do node --check "$file"; done
 npm pack --dry-run                          # 查看将发布的文件列表
-npm publish                                 # 发布到 npm（需先 npm login）
+npm publish                                 # 发布到 npm（需先 npm login，目前未发布）
 ```
 
 发布前记得同步升版本（`npm version patch|minor|major`）并更新 `CHANGELOG.md`。
-`package.json` 已声明 `publishConfig.access = public` 与 `provenance`；若在 CI 里发布并希望生成
-来源证明，用 `npm publish --provenance`（需 GitHub Actions 的 OIDC 环境）。
+`package.json` 已声明 `publishConfig.access = public` 与 `provenance`；`.github/workflows/publish.yml`
+会在发布 GitHub Release 时校验 tag 并执行 `npm publish --provenance`（需配置 `NPM_TOKEN` secret）。
+
+**当前未发布到 npm**，所以用 GitHub 安装；发布后再把上面的安装命令换成
+`dsh plugin --profile web add dsh-system-vitals`，并保持代码块里只有这一条。
 
 修改后重装即可生效：
 

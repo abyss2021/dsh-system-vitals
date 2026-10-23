@@ -36,7 +36,7 @@ window.__ModuleLoader__.load({
     const ORDER_KEY = 'dsh-system-vitals:order'
     const VISIBLE_KEY = 'dsh-system-vitals:visible'
     /** Reported by the layout diagnostics so a stale bundle is obvious. */
-    const VERSION = '1.3.8'
+    const VERSION = '1.3.11'
 
     /** Slot order and the identity of every metric; also the restore fallback. */
     const DEFAULT_ORDER = ['cpu', 'temperature', 'mem', 'disk', 'upload', 'download']
@@ -97,7 +97,11 @@ window.__ModuleLoader__.load({
      1. cap the strip against the width actually left over on that row, measured
         in JS from the sibling controls (a container-unit cap was silently
         dropped by the host page, so the strip kept its full width and forced
-        the wrap); and
+        the wrap), and applied from inside the ResizeObserver callback rather
+        than through React state — a state update is committed after the frame
+        has been painted, which left one frame per resize step showing the strip
+        too wide and squashing the row's shrinkable native controls before the
+        correction landed; and
      2. keep the strip on exactly ONE line, clipping at its right edge, so the
         row's height never changes. Wrapping the cells onto two lines grew the
         strip's height, and because the trailing cluster centres its items that
@@ -108,12 +112,11 @@ window.__ModuleLoader__.load({
 
    The cap is recomputed whenever that row resizes: it is the row's content width
    minus every control outside the strip's own branch, minus the gaps between
-   them, minus a 4px safety margin. Measuring the real controls keeps the reserve
+   them, minus a 12px safety margin. Measuring the real controls keeps the reserve
    correct when the model seat switches between its full label and the compact
    icon, which is exactly when a fixed reserve would be wrong. Below roughly
    400px of row width only one to two readings survive the cap; that is the
-   intended trade-off — the leading readings win over wrapping. The cqw unit is supported by every browser the Harness Web UI
-   targets (Chrome 105+, Safari 16+, Firefox 110+). */
+   intended trade-off — the leading readings win over wrapping. */
 .smx-root{box-sizing:border-box;display:flex;align-items:center;justify-content:flex-start;
   gap:10px;flex-wrap:nowrap;overflow:hidden;
   flex:0 1 auto;min-width:0;
@@ -425,6 +428,12 @@ window.__ModuleLoader__.load({
      * label (200px+) would starve the strip — but the collapsed seat plus the
      * submit button still occupy ~116px, and capping below that made the strip
      * underestimate the row and wrap.
+     *
+     * The budget is the row's CONTENT box, because that is the number the host
+     * compares its own "does everything fit" sum against (`width - paddings`).
+     * `clientWidth` still carries the row's horizontal padding, so being 16px
+     * more generous than the host is enough to make it flip its compact mode or
+     * wrap exactly at the boundary — subtract the padding as well.
      */
     function measureAvailable(element) {
       const container = findContainer(element)
@@ -456,13 +465,18 @@ window.__ModuleLoader__.load({
       const gap = style === null ? 0 : Number.parseFloat(style.columnGap) || 0
       const gaps = Math.max(0, count - 1) * gap
       const safety = 12
-      const available = container.clientWidth - used - gaps - safety
+      const padX = style === null
+        ? 0
+        : (Number.parseFloat(style.paddingLeft) || 0) + (Number.parseFloat(style.paddingRight) || 0)
+      const contentWidth = Math.max(0, container.clientWidth - padX)
+      const available = contentWidth - used - gaps - safety
       return {
         available: Math.max(0, Math.floor(available)),
-        row: container.clientWidth,
+        row: contentWidth,
         used: Math.round(used),
         gaps: Math.round(gaps + safety),
         gap,
+        padX: Math.round(padX),
         count,
         siblings: parts,
         tag: tagOf(container),
@@ -510,14 +524,40 @@ window.__ModuleLoader__.load({
       const rowRef = useRef(null)
 
       useLayoutEffect(() => {
-        const element = rootRef.current
-        if (element === null) return undefined
+        const mounted = rootRef.current
+        if (mounted === null) return undefined
+        let container = findContainer(mounted)
+        let observer = null
+        /**
+         * Put the cap on the element right now, without waiting for React.
+         *
+         * This is the whole point of writing styles from inside the observer: a
+         * `setState` here is committed in a scheduled task that runs AFTER the
+         * frame being rendered has been painted, so the frame that follows a
+         * window resize would still paint the strip at its previous (wider)
+         * width. That one frame of overflow is what squashes the row's
+         * shrinkable native controls — the `+`, the permission/mode selectors
+         * and the model seat — and makes them snap back a frame later, which is
+         * the flicker. Writing the style inside the callback keeps the
+         * correction inside the same rendering update, so no painted frame ever
+         * shows the strip wider than the row allows. The state update below
+         * only keeps React's own view of the cap in sync for later renders.
+         */
+        const apply = (element, limit) => {
+          const next = limit === null ? '' : `${limit}px`
+          if (element.style.maxWidth !== next) element.style.maxWidth = next
+        }
         const measure = () => {
-          if (typeof element.getBoundingClientRect !== 'function') return
+          // Read the live node: hiding every reading unmounts the strip, and the
+          // node that comes back is a new one.
+          const element = rootRef.current
+          if (element === null || typeof element.getBoundingClientRect !== 'function') return
+          if (observer !== null) observer.observe(element)
           const detail = measureAvailable(element)
           if (detail === null) {
             // No container to measure against: fall back to the natural width
             // rather than staying at the zero-width pre-measure state.
+            apply(element, null)
             capRef.current = null
             setCap(null)
             report({ stage: 'no-container' })
@@ -541,11 +581,25 @@ window.__ModuleLoader__.load({
             limit = fit > 0 && remainder < cell / 2 ? whole : Math.min(detail.available, Math.max(whole, 0))
             if (fit === 0) limit = 0
           }
+          // Sub-pixel noise would otherwise serialize a style different from the
+          // value React renders later and cause pointless writes.
+          limit = Math.round(limit * 100) / 100
+          // Same rendering update, before paint: this is not subject to the 4px
+          // hysteresis below, because the hysteresis exists to keep React from
+          // re-rendering on sub-pixel churn, not to leave the DOM wrong.
+          apply(element, limit)
           const rowChanged = rowRef.current !== detail.row
           rowRef.current = detail.row
-          if (rowChanged || Math.abs(limit - capRef.current) >= 4) {
+          if (rowChanged || capRef.current === null || Math.abs(limit - capRef.current) >= 4) {
             capRef.current = limit
             setCap(limit)
+          }
+          // Watch the row's own children as well: when the host flips the model
+          // seat between its label and its icon it changes THEIR widths, and the
+          // row's own width does not move at all, so a row-only observer would
+          // not notice that the space available to the strip just changed.
+          if (container !== null && observer !== null) {
+            for (const child of container.children) observer.observe(child)
           }
           report({
             stage: 'measured',
@@ -559,17 +613,20 @@ window.__ModuleLoader__.load({
             rendered: Math.round(element.getBoundingClientRect().width),
             container: detail.tag,
             gap: detail.gap,
+            padX: detail.padX,
             count: detail.count,
             siblings: detail.siblings,
           })
         }
+        if (typeof ResizeObserver === 'function') {
+          observer = new ResizeObserver(measure)
+          if (container !== null) observer.observe(container)
+          observer.observe(mounted)
+        }
         measure()
-        if (typeof ResizeObserver !== 'function') return undefined
-        const observer = new ResizeObserver(measure)
-        const container = findContainer(element)
-        if (container !== null) observer.observe(container)
-        observer.observe(element)
-        return () => observer.disconnect()
+        return () => {
+          if (observer !== null) observer.disconnect()
+        }
       }, [])
 
       const now = snapshot && snapshot.now ? snapshot.now : null

@@ -4,6 +4,33 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.11] - 2026-10-23
+
+Verified against the live Web UI in headless Chromium, sweeping the viewport
+1300 -> 470 px in 10 px steps: the 1.3.10 build paints 4 over-wide frames (the
+composer row wraps to a second line and snaps back) and ends the sweep
+permanently wrapped; this build paints none and keeps a single line.
+
+### Fixed
+
+- The left-hand controls no longer jump and snap back while the window width
+  changes. 1.3.10 measured the cap in a layout effect, which only covers
+  React's own commits: the resize path went through `setState` from a
+  `ResizeObserver`, and React commits a state update in a task that runs *after*
+  the current frame is painted. Every resize step therefore painted one frame
+  with the strip still at its previous, wider cap; that overflow squashed the
+  row's shrinkable native controls (`+`, the permission/mode selectors, the
+  model seat) for exactly that frame, and the next frame restored them — the
+  flicker. The cap is now written straight to the element's `max-width` inside
+  the observer callback, so the correction is part of the same rendering update
+  and no painted frame can show the strip wider than the row allows. The
+  observer also watches the row's children now, because the host flips the model
+  seat's compact mode by changing *their* widths without moving the row's width.
+- The cap is measured against the row's content box, the same box the host
+  compares its own "does everything fit" sum against. `clientWidth` carries the
+  row's 16px horizontal padding, so the strip used to plan with 4px less margin
+  than intended and could make the host wrap or compact right at the boundary.
+
 ## [1.3.10] - 2026-10-23
 
 ### Fixed

@@ -112,17 +112,28 @@ the submit button.
 The host row is `flex-wrap: wrap` and measures itself (`observeControlRow`) to decide whether
 the model seat goes compact — **the strip's width counts toward that measurement**, while
 `.trailing` is `flex: none`. An uncapped strip therefore forced the row to wrap, pushing the
-permission and submit controls away. The strip is capped at `100cqw - 250px` (the row width
-minus the space the host controls need) and wraps its own cells beyond that: it always yields,
-and the native buttons keep their place. The cap is measured at runtime rather than hardcoded: a `ResizeObserver` reads the row width,
-subtracts every control outside the strip's own ancestor branch plus the gaps, and keeps a 4px
-safety margin. The model seat counts at its compact width (24px), because the host collapses it
-to an icon when space runs short — planning for its expanded label starved the strip and then
-prevented the host from ever compacting.
+permission and submit controls away. The strip is capped at the row's leftover width and clips
+its own cells beyond it: it always yields, and the native buttons keep their place.
 
-Measured behaviour (row / cap / visible readings / host result): 396px→104px→1→single line;
-500px→208px→2→single line; 620px→328px→4→single line; 900px→482px→6→single line;
-1100px→482px→6→single line.
+The cap is measured at runtime rather than hardcoded: a `ResizeObserver` reads the row's
+**content box** — the same box the host compares its own "does it fit" sum against — subtracts
+every control outside the strip's own ancestor branch plus the gaps, and keeps a 12px safety
+margin. The model seat counts at its compact width, because the host collapses it to an icon
+when space runs short — planning for its expanded label starved the strip and then prevented
+the host from ever compacting.
+
+The important part is *when* the cap takes effect: it is written to the element's style from
+inside the observer callback, not routed through `setState`. A React state update is committed
+in a later task, after the frame has already been painted — so every resize step used to paint
+one frame with the strip at its old width, and that overflow squashed the row's shrinkable
+native controls (`+`, the permission/mode selectors, the model seat) for exactly one frame
+before snapping back. That was the left-hand "jump and return". Writing the style in the
+callback keeps the correction inside the same rendering update, so no painted frame ever shows
+an over-wide strip.
+
+Typical behaviour (row → visible readings → host result; the numbers drift a little with the
+font and the host version): 396px→1→single line; 500px→2→single line; 620px→4→single line;
+900px and above→6→single line.
 
 The strip is always **one line**: when it does not fit it clips at the right edge, so the
 **leading** readings survive — the head of your own order — and a 12px gradient hides the cut.

@@ -392,6 +392,8 @@ window.__ModuleLoader__.load({
 
     /* ---------------------------------------------------------------- strip */
 
+    const tagOf = (element) => `${element.tagName.toLowerCase()}.${String(element.className || '').split(' ')[0]}`
+
     /** The nearest ancestor that declares itself an inline-size container. */
     function findContainer(element) {
       let node = element?.parentElement ?? null
@@ -419,10 +421,13 @@ window.__ModuleLoader__.load({
 
       let used = 0
       let count = 0
+      const siblings = []
       for (const child of container.children) {
         if (branch.has(child)) continue
-        used += child.getBoundingClientRect().width
+        const width = child.getBoundingClientRect().width
+        used += width
         count += 1
+        siblings.push({ where: 'row', tag: tagOf(child), w: Math.round(width) })
       }
       // Siblings beside us on the way up to the container: the model seat and the
       // submit button. The model seat's contribution is capped at the compact
@@ -434,8 +439,10 @@ window.__ModuleLoader__.load({
         if (parent === null || parent === container) continue
         for (const sibling of parent.children) {
           if (sibling === node || branch.has(sibling)) continue
-          used += Math.min(sibling.getBoundingClientRect().width, 60)
+          const width = sibling.getBoundingClientRect().width
+          used += Math.min(width, 60)
           count += 1
+          siblings.push({ where: tagOf(parent), tag: tagOf(sibling), w: Math.round(width), counted: Math.round(Math.min(width, 60)) })
         }
       }
 
@@ -447,7 +454,10 @@ window.__ModuleLoader__.load({
         row: container.clientWidth,
         used: Math.round(used),
         gaps: Math.round(count * gap + 4),
-        tag: `${container.tagName.toLowerCase()}.${(container.className || '').toString().split(' ')[0]}`,
+        gap,
+        count,
+        siblings,
+        tag: tagOf(container),
       }
     }
 
@@ -506,6 +516,9 @@ window.__ModuleLoader__.load({
             natural: Math.round(element.scrollWidth),
             rendered: Math.round(element.getBoundingClientRect().width),
             container: detail.tag,
+            gap: detail.gap,
+            count: detail.count,
+            siblings: detail.siblings,
           })
         }
         measure()

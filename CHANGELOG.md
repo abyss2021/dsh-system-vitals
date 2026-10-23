@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.6] - 2026-10-23
+
+### Changed
+
+- The diagnostics report now lists every sibling the cap subtracts, with its real
+  width and the width actually counted. The first report showed the cap was never
+  binding (`available 486 > natural 442`), so the remaining wrap comes from the
+  model seat and gaps rather than from the strip's own width.
+
 ## [1.3.5] - 2026-10-23
 
 ### Added

@@ -512,16 +512,20 @@ window.__ModuleLoader__.load({
             report({ stage: 'no-container' })
             return
           }
-          // Snap to whole cells: a partially visible reading looks like a bug,
-          // so the last cell is dropped instead of being cut in half.
-          const cell = element.children.length > 0
-            ? element.children[0].getBoundingClientRect().width
-            : 0
+          // A partially visible reading looks broken, so drop the last cell when
+          // only a small part of it would show — but keep it when most of the
+          // cell is visible, otherwise a 2px shortfall would cost a whole reading.
+          // The first child is the injected <style>, so look the cell up by class.
+          const firstCell = typeof element.querySelector === 'function' ? element.querySelector('.smx-item') : null
+          const cell = firstCell === null ? 0 : firstCell.getBoundingClientRect().width
           let limit = detail.available
           if (cell > 0) {
             const unit = cell + detail.gap
             const fit = Math.floor((detail.available + detail.gap) / unit)
-            limit = fit > 0 ? Math.min(detail.available, fit * unit - detail.gap) : 0
+            const whole = fit > 0 ? fit * unit - detail.gap : 0
+            const remainder = detail.available - whole
+            limit = fit > 0 && remainder < cell / 2 ? whole : Math.min(detail.available, Math.max(whole, 0))
+            if (fit === 0) limit = 0
           }
           setCap(limit)
           report({

@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.9] - 2026-10-23
+
+### Fixed
+
+- The whole-cell snap never ran: it read `element.children[0]` as the first
+  reading, but the root's first child is the injected `<style>`. It now looks the
+  cell up by class, and only drops the last reading when less than half of it
+  would be visible — so a 2px shortfall no longer costs a whole reading.
+
 ## [1.3.8] - 2026-10-23
 
 ### Fixed

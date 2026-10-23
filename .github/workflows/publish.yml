@@ -38,7 +38,23 @@ jobs:
           node --check client.js
           for file in platform/*.js; do node --check "$file"; done
 
-      - name: Publish
+      # The package is released on GitHub first. npm publishing stays optional and
+      # switches on the moment NPM_TOKEN exists, so a GitHub release is green
+      # either way instead of failing on a missing secret.
+      - name: Check npm credentials
+        id: npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -n "${NODE_AUTH_TOKEN}" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=npm skipped::NPM_TOKEN is not configured; this release is GitHub-only."
+          fi
+
+      - name: Publish to npm
+        if: steps.npm.outputs.available == 'true'
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

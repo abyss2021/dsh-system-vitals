@@ -1,17 +1,20 @@
 /**
  * dsh-system-vitals client half.
  *
- * Registers one `conversation.input.left` entry that renders a single
- * always-visible status line — CPU, CPU temperature, memory, disk and live
- * upload/download throughput — inside the composer card's tool row, directly
- * right of the permission control.
+ * Registers:
+ *  - one `conversation.input.left` entry: the always-visible status line, inside
+ *    the composer card's tool row directly right of the permission control;
+ *  - one `settings.section` entry: a page that chooses which readings are shown.
  *
  * Layout contract: every reading is the same rigid cell (label · number ·
- * unit), so inter-parameter gaps are identical and the strip never reflows
- * when a digit appears. Numbers hold at most three significant digits; the
- * unit is rescaled (B/s → K/s → M/s) instead of widening the cell. The strip
- * must stay content-sized: giving it inline-size containment inside the
- * content-sized tool cluster collapses it to zero width.
+ * unit), so gaps are identical and the strip never reflows when a digit
+ * appears. Numbers hold at most three significant digits; the unit is rescaled
+ * (B/s → K/s → M/s) instead of widening the cell.
+ *
+ * Stability contract: the strip's contents never depend on the viewport or card
+ * width. Earlier versions hid readings with container queries, which made a
+ * user's custom order appear to "reset" on resize — visibility is now an
+ * explicit user preference, so resizing cannot change the order.
  *
  * Interaction: a cell can be selected (click, Enter or Space) and dragged to a
  * new slot, or moved with the arrow keys while focused. Cells are equal width
@@ -23,12 +26,13 @@ window.__ModuleLoader__.load({
   factory(require) {
     const React = require('react')
     const h = React.createElement
-    const { useCallback, useEffect, useRef, useState } = React
+    const { useCallback, useEffect, useRef, useState, useSyncExternalStore } = React
 
     const NS = 'dsh-system-vitals'
     const ENDPOINT = '/system-vitals/api/snapshot'
     const POLL_MS = 2000
-    const STORAGE_KEY = 'dsh-system-vitals:order'
+    const ORDER_KEY = 'dsh-system-vitals:order'
+    const VISIBLE_KEY = 'dsh-system-vitals:visible'
 
     /** Slot order and the identity of every metric; also the restore fallback. */
     const DEFAULT_ORDER = ['cpu', 'temperature', 'mem', 'disk', 'upload', 'download']
@@ -43,6 +47,19 @@ window.__ModuleLoader__.load({
       waiting: '采样中…',
       unavailable: '不可用',
       reorderHint: '拖动或用左右方向键调整顺序',
+      nav: '系统体征',
+      settingsTitle: '系统体征',
+      settingsIntro: '选择在输入框工具行里显示哪些读数，并查看当前顺序。取消勾选即隐藏。',
+      showLabel: '显示的读数',
+      orderLabel: '顺序',
+      orderHint: '在工具行里拖动某个读数，或用左右方向键调整顺序。',
+      resetOrder: '恢复默认顺序',
+      showAll: '全部显示',
+      resetTip: '以上偏好保存在浏览器本地（localStorage），刷新后仍然生效。',
+      preview: '预览',
+      empty: '全部读数已隐藏，工具行不会显示任何内容。',
+      switchOn: '显示',
+      switchOff: '隐藏',
     }
 
     const en = {
@@ -55,6 +72,19 @@ window.__ModuleLoader__.load({
       waiting: 'sampling…',
       unavailable: 'n/a',
       reorderHint: 'Drag or use the arrow keys to reorder',
+      nav: 'System Vitals',
+      settingsTitle: 'System Vitals',
+      settingsIntro: 'Choose which readings appear in the composer tool row. Uncheck one to hide it.',
+      showLabel: 'Readings',
+      orderLabel: 'Order',
+      orderHint: 'Drag a reading in the tool row, or move it with the arrow keys.',
+      resetOrder: 'Reset order',
+      showAll: 'Show all',
+      resetTip: 'These preferences live in this browser (localStorage) and survive a reload.',
+      preview: 'Preview',
+      empty: 'Every reading is hidden, so the tool row shows nothing.',
+      switchOn: 'Shown',
+      switchOff: 'Hidden',
     }
 
     const STYLES = `
@@ -72,12 +102,122 @@ window.__ModuleLoader__.load({
 .smx-val{flex:none;width:3ch;text-align:right;color:var(--dsw-alias-label-secondary);font-weight:500}
 .smx-unit{flex:none;width:3ch;text-align:left;white-space:nowrap;color:var(--dsw-alias-label-tertiary)}
 .smx-wait{flex:none;white-space:nowrap;color:var(--dsw-alias-label-tertiary);opacity:.85}
-/* The composer tool row is itself an inline-size container, so these queries
-   measure the card width (not our own, which is content-sized). Narrow cards
-   drop secondary readings instead of overflowing the toolbar. */
-@container (max-width: 860px){.smx-item[data-priority="3"]{display:none}}
-@container (max-width: 620px){.smx-item[data-priority="2"]{display:none}}
+
+/* Settings page: rows follow the settings shell's own rhythm. */
+.sv-root{display:flex;flex-direction:column;width:100%;gap:18px;padding:8px 2px 32px;
+  color:var(--dsw-alias-label-primary)}
+.sv-intro{color:var(--dsw-alias-label-secondary);font-size:13px;line-height:20px}
+.sv-groupTitle{color:var(--dsw-alias-label-primary);font-size:14px;font-weight:500;line-height:20px}
+.sv-groupHint{color:var(--dsw-alias-label-secondary);margin-top:4px;font-size:12px;line-height:18px}
+.sv-list{display:flex;flex-direction:column;margin-top:8px}
+.sv-row{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:12px 0;
+  border-bottom:.5px solid var(--dsw-alias-border-l2)}
+.sv-row:last-child{border-bottom:none}
+.sv-rowMain{display:flex;align-items:baseline;gap:10px;min-width:0}
+.sv-index{color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums;font-size:12px;min-width:2ch}
+.sv-name{color:var(--dsw-alias-label-primary);font-size:14px;line-height:20px}
+.sv-reading{color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums;font-size:12px}
+.sv-switch{flex:none;position:relative;width:40px;height:22px;padding:0;border:none;border-radius:999px;
+  cursor:pointer;background:var(--dsw-alias-interactive-bg-hover);
+  transition:background-color .15s ease}
+.sv-switch[aria-checked="true"]{background:var(--dsw-alias-brand-primary)}
+.sv-switch:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+.sv-knob{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;
+  background:var(--dsw-alias-bg-layer-1);transition:transform .15s ease}
+.sv-switch[aria-checked="true"] .sv-knob{transform:translateX(18px)}
+.sv-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+.sv-button{border:.5px solid var(--dsw-alias-border-l2);border-radius:6px;background:none;cursor:pointer;
+  color:var(--dsw-alias-label-secondary);padding:5px 10px;font-size:12px;line-height:18px}
+.sv-button:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
+.sv-button:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}
+.sv-preview{margin-top:8px;padding:10px 12px;border:.5px solid var(--dsw-alias-border-l1);border-radius:8px;
+  background:var(--dsw-alias-bg-layer-1)}
+.sv-previewRow{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.sv-empty{color:var(--dsw-alias-label-secondary);font-size:13px}
+.sv-tip{color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}
 `
+
+    /* ---------------------------------------------------------------- store */
+
+    /**
+     * Shared, reactive preferences. The strip and the settings page live in
+     * different slots but the same module instance, so one module-level store
+     * keeps them in sync — including across two mounted strips.
+     */
+    function readStored(key, fallback, reconcile) {
+      try {
+        const raw = window.localStorage.getItem(key)
+        if (raw === null) return fallback
+        const parsed = JSON.parse(raw)
+        return reconcile(parsed)
+      } catch {
+        return fallback
+      }
+    }
+
+    const reconcileOrder = (parsed) => {
+      if (!Array.isArray(parsed)) return DEFAULT_ORDER
+      const known = parsed.filter((id) => DEFAULT_ORDER.includes(id))
+      const missing = DEFAULT_ORDER.filter((id) => !known.includes(id))
+      return [...new Set(known), ...missing]
+    }
+
+    const reconcileVisible = (parsed) => {
+      if (!Array.isArray(parsed)) return [...DEFAULT_ORDER]
+      const known = parsed.filter((id) => DEFAULT_ORDER.includes(id))
+      return known.length > 0 ? [...new Set(known)] : []
+    }
+
+    const store = {
+      order: readStored(ORDER_KEY, DEFAULT_ORDER, reconcileOrder),
+      visible: readStored(VISIBLE_KEY, DEFAULT_ORDER, reconcileVisible),
+      listeners: new Set(),
+      snapshot: null,
+      subscribe(listener) {
+        this.listeners.add(listener)
+        return () => this.listeners.delete(listener)
+      },
+      getSnapshot() {
+        if (this.snapshot === null) this.snapshot = { order: this.order, visible: this.visible }
+        return this.snapshot
+      },
+      write(next) {
+        if (next.order !== undefined) this.order = next.order
+        if (next.visible !== undefined) this.visible = next.visible
+        this.snapshot = { order: this.order, visible: this.visible }
+        try {
+          window.localStorage.setItem(ORDER_KEY, JSON.stringify(this.order))
+          window.localStorage.setItem(VISIBLE_KEY, JSON.stringify(this.visible))
+        } catch {
+          /* A blocked localStorage keeps the preference for this session only. */
+        }
+        for (const listener of this.listeners) listener()
+      },
+      setOrder(order) {
+        this.write({ order })
+      },
+      toggle(id) {
+        const visible = this.visible.includes(id)
+          ? this.visible.filter((entry) => entry !== id)
+          : [...this.visible, id]
+        // Keep `visible` in canonical metric order so a toggle never reshuffles
+        // the strip; display order always comes from `order`.
+        this.write({ visible: DEFAULT_ORDER.filter((entry) => visible.includes(entry)) })
+      },
+      resetOrder() {
+        this.write({ order: [...DEFAULT_ORDER] })
+      },
+      showAll() {
+        this.write({ visible: [...DEFAULT_ORDER] })
+      },
+    }
+
+    const usePreferences = () => useSyncExternalStore(
+      (listener) => store.subscribe(listener),
+      () => store.getSnapshot(),
+    )
+
+    /* --------------------------------------------------------------- format */
 
     /** Compact GiB figure without the unit, e.g. `1` or `0.4`. */
     function formatGiB(bytes) {
@@ -131,26 +271,20 @@ window.__ModuleLoader__.load({
       return 'var(--dsw-alias-label-secondary)'
     }
 
-    /** Stored order, reconciled against the metrics this build knows. */
-    function readOrder() {
-      try {
-        const raw = window.localStorage.getItem(STORAGE_KEY)
-        if (raw === null) return DEFAULT_ORDER
-        const parsed = JSON.parse(raw)
-        if (!Array.isArray(parsed)) return DEFAULT_ORDER
-        const known = parsed.filter((id) => DEFAULT_ORDER.includes(id))
-        const missing = DEFAULT_ORDER.filter((id) => !known.includes(id))
-        return [...new Set(known), ...missing]
-      } catch {
-        return DEFAULT_ORDER
-      }
-    }
-
-    function moveSlot(order, from, to) {
-      if (from === to || from < 0 || to < 0 || from >= order.length || to >= order.length) return order
-      const next = [...order]
-      const [moved] = next.splice(from, 1)
-      next.splice(to, 0, moved)
+    /**
+     * Move the reading at visible index `from` to visible index `to`, operating on
+     * the FULL order so hidden readings keep their slots instead of being dropped.
+     */
+    function moveWithinVisible(order, visible, from, to) {
+      const shown = order.filter((id) => visible.includes(id))
+      if (from === to || from < 0 || to < 0 || from >= shown.length || to >= shown.length) return order
+      const movingId = shown[from]
+      const anchorId = shown[to]
+      const next = order.filter((id) => id !== movingId)
+      const anchorIndex = next.indexOf(anchorId)
+      if (anchorIndex < 0) return order
+      // Insert before the anchor when moving left, after it when moving right.
+      next.splice(from < to ? anchorIndex + 1 : anchorIndex, 0, movingId)
       return next
     }
 
@@ -186,74 +320,63 @@ window.__ModuleLoader__.load({
       return { snapshot, failed }
     }
 
-    function MetricsBar(props) {
-      const t = typeof props.t === 'function' ? props.t : (key) => key
-      const { snapshot, failed } = useSnapshot()
-      const [order, setOrder] = useState(readOrder)
-      const [selected, setSelected] = useState(null)
-      const [dragging, setDragging] = useState(null)
-      // Slot index being dragged, kept in a ref so drag handlers always read the
-      // newest value without waiting for a re-render.
-      const dragFrom = useRef(null)
-
-      const persist = useCallback((next) => {
-        setOrder(next)
-        try {
-          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
-        } catch {
-          /* A blocked localStorage keeps the order for this session only. */
-        }
-      }, [])
-
-      const now = snapshot && snapshot.now ? snapshot.now : null
+    /** All readings for one snapshot, keyed by metric id. */
+    function buildMetrics(now, t) {
       const cpuPercent = now && now.cpu ? now.cpu.percent : null
       const memory = now ? now.mem ?? null : null
       const disk = now ? now.disk ?? null : null
       const net = now ? now.net ?? null : null
-
-      /** Everything the renderer needs per metric, keyed by slot id. */
-      const metrics = {
+      return {
         cpu: {
           label: t('cpu'),
           reading: splitPercent(cpuPercent),
           color: tone(cpuPercent, 75, 90),
           title: `CPU ${Number.isFinite(cpuPercent) ? Math.round(cpuPercent * 10) / 10 : '—'}%`,
-          priority: 1,
         },
         temperature: {
           label: t('temperature'),
           reading: splitTemperature(now ? now.temperature : Number.NaN),
           color: tone(now ? now.temperature : Number.NaN, 80, 92),
           title: now && Number.isFinite(now.temperature) ? `${now.temperature}°C` : undefined,
-          priority: 1,
         },
         mem: {
           label: t('mem'),
           reading: splitPercent(memory ? memory.percent : Number.NaN),
           color: tone(memory ? memory.percent : Number.NaN, 80, 92),
           title: memory ? `${formatGiB(memory.used)}G / ${formatGiB(memory.total)}G` : undefined,
-          priority: 1,
         },
         disk: {
           label: t('disk'),
           reading: splitPercent(disk ? disk.percent : Number.NaN),
           color: tone(disk ? disk.percent : Number.NaN, 85, 95),
           title: disk ? `${formatGiB(disk.used)}G / ${formatGiB(disk.total)}G` : undefined,
-          priority: 2,
         },
         upload: {
           label: t('upload'),
           reading: splitRate(net ? net.tx : Number.NaN),
           title: net ? `${Math.round(net.tx / 1024)} KB/s` : undefined,
-          priority: 3,
         },
         download: {
           label: t('download'),
           reading: splitRate(net ? net.rx : Number.NaN),
           title: net ? `${Math.round(net.rx / 1024)} KB/s` : undefined,
-          priority: 3,
         },
       }
+    }
+
+    /* ---------------------------------------------------------------- strip */
+
+    function MetricsBar(props) {
+      const t = typeof props.t === 'function' ? props.t : (key) => key
+      const { snapshot, failed } = useSnapshot()
+      const { order, visible } = usePreferences()
+      const [selected, setSelected] = useState(null)
+      const [dragging, setDragging] = useState(null)
+      // Slot index being dragged, kept in a ref so drag handlers always read the
+      // newest value without waiting for a re-render.
+      const dragFrom = useRef(null)
+
+      const now = snapshot && snapshot.now ? snapshot.now : null
 
       if (now === null) {
         return h(
@@ -264,10 +387,14 @@ window.__ModuleLoader__.load({
         )
       }
 
-      const cells = order.map((id, index) => {
+      const metrics = buildMetrics(now, t)
+      const shown = order.filter((id) => visible.includes(id))
+      if (shown.length === 0) return null
+
+      const cells = shown.map((id, index) => {
         const metric = metrics[id]
         if (metric === undefined) return null
-        const label = metric.title === undefined ? metric.label : `${metric.label} · ${metric.title}`
+        const caption = metric.title === undefined ? metric.label : `${metric.label} · ${metric.title}`
         return h(
           'span',
           {
@@ -276,11 +403,10 @@ window.__ModuleLoader__.load({
             draggable: true,
             tabIndex: 0,
             role: 'listitem',
-            'data-priority': metric.priority,
             'data-selected': selected === id,
             'data-dragging': dragging === id,
             'aria-label': `${metric.label} ${metric.reading.number}${metric.reading.unit} — ${t('reorderHint')}`,
-            title: label,
+            title: caption,
             onDragStart: (event) => {
               // Keep the composer's own file-drop handling out of this drag.
               event.stopPropagation()
@@ -298,7 +424,7 @@ window.__ModuleLoader__.load({
               const from = dragFrom.current
               if (from === null || from === index) return
               dragFrom.current = index
-              persist(moveSlot(order, from, index))
+              store.setOrder(moveWithinVisible(order, visible, from, index))
             },
             onDrop: (event) => {
               event.preventDefault()
@@ -315,8 +441,8 @@ window.__ModuleLoader__.load({
               if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
                 event.preventDefault()
                 const to = event.key === 'ArrowLeft' ? index - 1 : index + 1
-                if (to < 0 || to >= order.length) return
-                persist(moveSlot(order, index, to))
+                if (to < 0 || to >= shown.length) return
+                store.setOrder(moveWithinVisible(order, visible, index, to))
                 setSelected(id)
               } else if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault()
@@ -337,6 +463,109 @@ window.__ModuleLoader__.load({
         cells,
       )
     }
+
+    /* ------------------------------------------------------------- settings */
+
+    function Switch({ checked, label, onToggle }) {
+      return h(
+        'button',
+        {
+          type: 'button',
+          className: 'sv-switch',
+          role: 'switch',
+          'aria-checked': checked,
+          'aria-label': label,
+          title: label,
+          onClick: onToggle,
+        },
+        h('span', { className: 'sv-knob' }),
+      )
+    }
+
+    function VitalsSettings(props) {
+      const t = typeof props.t === 'function' ? props.t : (key) => key
+      const { snapshot } = useSnapshot()
+      const { order, visible } = usePreferences()
+      const now = snapshot && snapshot.now ? snapshot.now : null
+      const metrics = buildMetrics(now, t)
+
+      const rows = order.map((id, index) => {
+        const metric = metrics[id]
+        if (metric === undefined) return null
+        const checked = visible.includes(id)
+        const reading = now === null ? '—' : `${metric.reading.number}${metric.reading.unit}`
+        return h(
+          'div',
+          { className: 'sv-row', key: id },
+          h(
+            'span',
+            { className: 'sv-rowMain' },
+            h('span', { className: 'sv-index' }, `${index + 1}`),
+            h('span', { className: 'sv-name' }, metric.label),
+            h('span', { className: 'sv-reading' }, reading),
+          ),
+          h(Switch, {
+            checked,
+            label: `${metric.label} — ${checked ? t('switchOn') : t('switchOff')}`,
+            onToggle: () => store.toggle(id),
+          }),
+        )
+      })
+
+      const preview = order.filter((id) => visible.includes(id)).map((id) => {
+        const metric = metrics[id]
+        return h(
+          'span',
+          { className: 'smx-item', key: id, title: metric.title ?? metric.label },
+          h('span', { className: 'smx-key' }, metric.label),
+          h('span', { className: 'smx-val', style: metric.color === undefined ? undefined : { color: metric.color } }, metric.reading.number),
+          h('span', { className: 'smx-unit' }, metric.reading.unit),
+        )
+      })
+
+      return h(
+        'div',
+        { className: 'sv-root' },
+        h('style', null, STYLES),
+        h('div', { className: 'sv-intro' }, t('settingsIntro')),
+        h(
+          'div',
+          null,
+          h('div', { className: 'sv-groupTitle' }, t('showLabel')),
+          h(
+            'div',
+            { className: 'sv-list' },
+            rows,
+          ),
+          h(
+            'div',
+            { className: 'sv-actions' },
+            h('button', { className: 'sv-button', type: 'button', onClick: () => store.showAll() }, t('showAll')),
+          ),
+        ),
+        h(
+          'div',
+          null,
+          h('div', { className: 'sv-groupTitle' }, t('orderLabel')),
+          h('div', { className: 'sv-groupHint' }, t('orderHint')),
+          h(
+            'div',
+            { className: 'sv-actions' },
+            h('button', { className: 'sv-button', type: 'button', onClick: () => store.resetOrder() }, t('resetOrder')),
+          ),
+          h(
+            'div',
+            { className: 'sv-preview' },
+            preview.length > 0
+              ? h('div', { className: 'sv-previewRow' }, preview)
+              : h('span', { className: 'sv-empty' }, t('empty')),
+          ),
+        ),
+        h('div', { className: 'sv-tip' }, t('resetTip')),
+      )
+    }
+
+    /* ------------------------------------------------------------- register */
 
     return {
       inject: ['slots', 'locale'],
@@ -361,6 +590,19 @@ window.__ModuleLoader__.load({
               locale: NS,
             },
             MetricsBar,
+          ),
+        )
+
+        ctx.slots.inject('settings.section', () =>
+          ctx.slots.register(
+            {
+              name: 'settings.section',
+              id: 'system-vitals',
+              order: 46,
+              label: () => ctx.locale.bind(NS)('nav'),
+              locale: NS,
+            },
+            VitalsSettings,
           ),
         )
       },

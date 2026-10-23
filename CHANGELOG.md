@@ -4,6 +4,30 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-10-23
+
+### Fixed
+
+- Resizing the window no longer disturbs a custom order. The container queries
+  that hid readings on a narrow card are gone: hiding is now an explicit
+  preference, so the visible set and its order can never be recomputed by a
+  viewport change.
+
+### Added
+
+- A **System Vitals** page in Settings (`settings.section`) listing every
+  reading with a switch to show or hide it, a live preview of the resulting
+  strip, `Show all`, and `Reset order`.
+- Reordering now operates on the full order, so moving a reading while others
+  are hidden keeps every hidden reading in its slot instead of dropping it.
+- Preferences are shared through one reactive store, so the settings page and
+  the strip stay in sync; `visible` is kept in canonical order so toggling never
+  reshuffles the strip.
+
+### Changed
+
+- The strip renders nothing when every reading is hidden.
+
 ## [1.2.0] - 2026-10-23
 
 ### Added

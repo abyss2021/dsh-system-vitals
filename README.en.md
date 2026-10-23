@@ -89,18 +89,19 @@ Every reading is an independently selectable cell:
 Cells are equal width and dragging leaves **no placeholder**, so the strip's width and
 absolute position are identical in every order — only which reading occupies which slot changes.
 
-## Narrow windows
+## Choosing which readings appear
 
-The composer tool row is already an inline-size container, and the plugin queries it
-directly — never its own width, which would collapse to zero inside the content-sized cluster:
+**Settings → System Vitals** lists every reading with a switch:
 
-| Card width | Shown |
-|---|---|
-| > 860px | all six readings |
-| ≤ 860px | upload/download hidden |
-| ≤ 620px | disk hidden as well; CPU, temperature and memory remain |
+- Uncheck a reading to hide it; a live preview shows the resulting strip.
+- `Show all` restores everything; the Order group offers `Reset order`.
 
-Hidden readings stay available in the tooltip.
+Preferences live in `localStorage` (`dsh-system-vitals:visible` / `:order`) and survive reloads.
+
+> **Why width-based hiding is gone**: earlier versions used container queries to drop
+> secondary readings on a narrow card, which made a custom order look "reset" after a
+> resize. Visibility is now your explicit choice, so **window width never changes what is
+> shown or in which order**. On a narrow window, hide the readings you do not care about.
 
 ## Configuration
 

@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.10] - 2026-10-23
+
+### Fixed
+
+- No more transient jump of the composer's left controls while resizing. Three
+  causes are addressed: the strip started at its natural width and only shrank
+  after a post-paint effect ran (the overflow in that frame pushed the `+` and
+  permission controls onto their own line); the cap is now measured in a layout
+  effect and the strip starts at zero width, so no paint ever overflows. A 4px
+  hysteresis stops sub-pixel churn, and the safety margin grew from 4px to 12px
+  so the host's compact-mode toggle no longer flips on rounding.
+
 ## [1.3.9] - 2026-10-23
 
 ### Fixed

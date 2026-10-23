@@ -27,6 +27,8 @@ window.__ModuleLoader__.load({
     const React = require('react')
     const h = React.createElement
     const { useCallback, useEffect, useRef, useState, useSyncExternalStore } = React
+    // Measuring before paint keeps the intermediate (too wide) state off screen.
+    const useLayoutEffect = React.useLayoutEffect ?? React.useEffect
 
     const NS = 'dsh-system-vitals'
     const ENDPOINT = '/system-vitals/api/snapshot'
@@ -453,7 +455,7 @@ window.__ModuleLoader__.load({
       const style = typeof window.getComputedStyle === 'function' ? window.getComputedStyle(container) : null
       const gap = style === null ? 0 : Number.parseFloat(style.columnGap) || 0
       const gaps = Math.max(0, count - 1) * gap
-      const safety = 4
+      const safety = 12
       const available = container.clientWidth - used - gaps - safety
       return {
         available: Math.max(0, Math.floor(available)),
@@ -496,19 +498,28 @@ window.__ModuleLoader__.load({
       const { order, visible } = usePreferences()
       const [selected, setSelected] = useState(null)
       const [dragging, setDragging] = useState(null)
-      const [cap, setCap] = useState(null)
+      const [cap, setCap] = useState(0)
       const rootRef = useRef(null)
       // Slot index being dragged, kept in a ref so drag handlers always read the
       // newest value without waiting for a re-render.
       const dragFrom = useRef(null)
+      // Hysteresis: ignore sub-pixel churn and only re-apply a materially
+      // different cap, so a resize never makes the strip and the row's compact
+      // mode chase each other.
+      const capRef = useRef(0)
+      const rowRef = useRef(null)
 
-      useEffect(() => {
+      useLayoutEffect(() => {
         const element = rootRef.current
         if (element === null) return undefined
         const measure = () => {
           if (typeof element.getBoundingClientRect !== 'function') return
           const detail = measureAvailable(element)
           if (detail === null) {
+            // No container to measure against: fall back to the natural width
+            // rather than staying at the zero-width pre-measure state.
+            capRef.current = null
+            setCap(null)
             report({ stage: 'no-container' })
             return
           }
@@ -519,15 +530,23 @@ window.__ModuleLoader__.load({
           const firstCell = typeof element.querySelector === 'function' ? element.querySelector('.smx-item') : null
           const cell = firstCell === null ? 0 : firstCell.getBoundingClientRect().width
           let limit = detail.available
+          const selfGap = Number.parseFloat(
+            typeof window.getComputedStyle === 'function' ? window.getComputedStyle(element).columnGap : '',
+          ) || 10
           if (cell > 0) {
-            const unit = cell + detail.gap
-            const fit = Math.floor((detail.available + detail.gap) / unit)
-            const whole = fit > 0 ? fit * unit - detail.gap : 0
+            const unit = cell + selfGap
+            const fit = Math.floor((detail.available + selfGap) / unit)
+            const whole = fit > 0 ? fit * unit - selfGap : 0
             const remainder = detail.available - whole
             limit = fit > 0 && remainder < cell / 2 ? whole : Math.min(detail.available, Math.max(whole, 0))
             if (fit === 0) limit = 0
           }
-          setCap(limit)
+          const rowChanged = rowRef.current !== detail.row
+          rowRef.current = detail.row
+          if (rowChanged || Math.abs(limit - capRef.current) >= 4) {
+            capRef.current = limit
+            setCap(limit)
+          }
           report({
             stage: 'measured',
             available: detail.available,

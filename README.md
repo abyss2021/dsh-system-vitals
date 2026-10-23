@@ -4,7 +4,7 @@
 [![Node](https://img.shields.io/badge/node-%E2%89%A520-339933)](https://nodejs.org)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-6c757d)](#兼容性)
 
-**DeepSeek Harness 的系统体征插件** —— 在输入框卡片内部工具行、紧贴「自动审查」右侧，常驻显示
+**DeepSeek Harness 的「负载条」插件** —— 在输入框卡片内部工具行、紧贴「自动审查」右侧，常驻显示
 **CPU 占用、CPU 温度、内存、磁盘、实时上传/下载速率**；Linux / macOS / Windows 三平台，每秒采样，零运行时依赖。
 
 ```
@@ -80,7 +80,7 @@ Host 每秒采样一次，Client 每 2 秒轮询 `GET /system-vitals/api/snapsho
 
 ## 显示哪些读数
 
-**设置 → 系统体征** 里逐项开关：
+**设置 → 负载条** 里逐项开关：
 
 - 列出全部读数，每项一个开关，取消勾选即隐藏；
 - 下方实时预览当前会显示成什么样；

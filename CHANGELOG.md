@@ -11,6 +11,12 @@ Verified against the live Web UI in headless Chromium, sweeping the viewport
 composer row wraps to a second line and snaps back) and ends the sweep
 permanently wrapped; this build paints none and keeps a single line.
 
+### Changed
+
+- Chinese display name is now 「负载条」 (was 「系统体征」): the settings nav entry
+  and the plugin-market title. The package name stays `dsh-system-vitals`, so
+  installed copies and install commands are unaffected.
+
 ### Fixed
 
 - The left-hand controls no longer jump and snap back while the window width

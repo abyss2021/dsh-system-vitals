@@ -51,7 +51,7 @@ window.__ModuleLoader__.load({
       waiting: '采样中…',
       unavailable: '不可用',
       reorderHint: '拖动或用左右方向键调整顺序',
-      nav: '系统体征',
+      nav: '负载条',
       settingsIntro: '选择在输入框工具行里显示哪些读数。取消勾选即隐藏。',
       showLabel: '显示的读数',
       orderLabel: '顺序',

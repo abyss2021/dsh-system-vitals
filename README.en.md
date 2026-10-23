@@ -51,8 +51,9 @@ dsh plugin --profile web remove dsh-system-vitals
 
 > The package is a **bundle plus a Client half**: the Host side samples and serves one
 > same-origin HTTP route, the Client side registers a React component into
-> `conversation.input.left`. There is no build step — `client.js` is a browser module the
-> Harness module loader can execute directly.
+> `conversation.input.right` (the composer card's `.trailing` cluster, on the submit
+> button's row) and one into `settings.section`. There is no build step — `client.js` is a
+> browser module the Harness module loader can execute directly.
 
 ## What it shows
 
@@ -102,6 +103,13 @@ Preferences live in `localStorage` (`dsh-system-vitals:visible` / `:order`) and 
 > secondary readings on a narrow card, which made a custom order look "reset" after a
 > resize. Visibility is now your explicit choice, so **window width never changes what is
 > shown or in which order**. On a narrow window, hide the readings you do not care about.
+
+## Placement and wrapping
+
+The strip registers in `conversation.input.right`, inside the `.trailing` flex cluster with
+the submit button. The host row is `flex-wrap: wrap` with `.tools` and `.trailing` as
+siblings: a strip inside `.tools` stayed on the first line while the submit button wrapped to
+the second, which read as the strip jumping upward. In `.trailing` the two always wrap together.
 
 ## Configuration
 

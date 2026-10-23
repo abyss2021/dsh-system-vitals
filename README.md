@@ -44,7 +44,8 @@ dsh plugin --profile web remove dsh-system-vitals
 ```
 
 > 本插件是 **bundle + Client half** 的组合：Host 半侧负责采样并暴露一条同源 HTTP 路由，
-> Client 半侧向 `conversation.input.left` 注册一个 React 组件。不需要构建步骤，`client.js` 是可直接加载的浏览器模块。
+> Client 半侧向 `conversation.input.right`（输入框卡片 `.trailing` 组，与发送按钮同行）和 `settings.section`
+> 各注册一个 React 组件。不需要构建步骤，`client.js` 是可直接加载的浏览器模块。
 
 ## 显示内容
 
@@ -88,6 +89,12 @@ Host 每秒采样一次，Client 每 2 秒轮询 `GET /system-vitals/api/snapsho
 偏好存在浏览器 `localStorage`（`dsh-system-vitals:visible` / `:order`），刷新与重启后保留。
 
 > **为什么不再按窗口宽度自动隐藏**：早期版本用容器查询在窄窗口隐藏次要读数，结果用户自定义的顺序会在改变窗口宽度时"看起来被重置"。现在显隐完全由你决定，**窗口宽度不再影响显示内容与顺序**。窄窗口下若嫌挤，请用设置页手动关掉不关心的项。
+
+## 位置与换行
+
+细条挂在 `conversation.input.right`，位于 `.trailing` 组内、与发送按钮同一 flex 组。宿主那行是
+`flex-wrap: wrap`，`.tools` 与 `.trailing` 为同级子项——若把细条放进 `.tools`，窄窗口下发送按钮会换到
+第二行而细条留在第一行，看起来就像"细条往上跳"。放在 `.trailing` 里，两者始终一起换行。
 
 ## 配置
 

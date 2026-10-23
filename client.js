@@ -2,8 +2,8 @@
  * dsh-system-vitals client half.
  *
  * Registers:
- *  - one `conversation.input.left` entry: the always-visible status line, inside
- *    the composer card's tool row directly right of the permission control;
+ *  - one `conversation.input.right` entry: the always-visible status line, in the
+ *    composer's trailing cluster on the submit button's row;
  *  - one `settings.section` entry: a page that chooses which readings are shown.
  *
  * Layout contract: every reading is the same rigid cell (label · number ·
@@ -48,15 +48,13 @@ window.__ModuleLoader__.load({
       unavailable: '不可用',
       reorderHint: '拖动或用左右方向键调整顺序',
       nav: '系统体征',
-      settingsTitle: '系统体征',
-      settingsIntro: '选择在输入框工具行里显示哪些读数，并查看当前顺序。取消勾选即隐藏。',
+      settingsIntro: '选择在输入框工具行里显示哪些读数。取消勾选即隐藏。',
       showLabel: '显示的读数',
       orderLabel: '顺序',
-      orderHint: '在工具行里拖动某个读数，或用左右方向键调整顺序。',
+      orderHint: '在工具行里拖动某个读数，或用左右方向键调整顺序；顺序与显隐都会保留。',
       resetOrder: '恢复默认顺序',
       showAll: '全部显示',
       resetTip: '以上偏好保存在浏览器本地（localStorage），刷新后仍然生效。',
-      preview: '预览',
       empty: '全部读数已隐藏，工具行不会显示任何内容。',
       switchOn: '显示',
       switchOff: '隐藏',
@@ -73,7 +71,6 @@ window.__ModuleLoader__.load({
       unavailable: 'n/a',
       reorderHint: 'Drag or use the arrow keys to reorder',
       nav: 'System Vitals',
-      settingsTitle: 'System Vitals',
       settingsIntro: 'Choose which readings appear in the composer tool row. Uncheck one to hide it.',
       showLabel: 'Readings',
       orderLabel: 'Order',
@@ -81,7 +78,6 @@ window.__ModuleLoader__.load({
       resetOrder: 'Reset order',
       showAll: 'Show all',
       resetTip: 'These preferences live in this browser (localStorage) and survive a reload.',
-      preview: 'Preview',
       empty: 'Every reading is hidden, so the tool row shows nothing.',
       switchOn: 'Shown',
       switchOff: 'Hidden',
@@ -90,7 +86,7 @@ window.__ModuleLoader__.load({
     const STYLES = `
 /* One rigid cell for the composer tool row: 4ch label + 3ch number + 3ch unit. */
 .smx-root{box-sizing:border-box;display:flex;align-items:center;justify-content:flex-start;gap:10px;
-  flex:0 1 auto;min-width:0;overflow:hidden;
+  flex:0 1 auto;min-width:0;overflow:hidden;white-space:nowrap;
   color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:18px;font-variant-numeric:tabular-nums}
 .smx-item{display:inline-flex;align-items:baseline;gap:3px;flex:none;width:calc(10ch + 6px);
   border-radius:4px;cursor:grab;user-select:none;transition:background-color .12s ease,box-shadow .12s ease}
@@ -578,13 +574,16 @@ window.__ModuleLoader__.load({
             }),
           'dsh-system-vitals: locale',
         )
-        // Inside the composer card's tool row, immediately right of the
-        // permission control (自动审查): `conversation.input.left` renders right
-        // after `conversation.input.permission`.
-        ctx.slots.inject('conversation.input.left', () =>
+        // `conversation.input.right` lives inside the composer's `.trailing`
+        // cluster, the same flex group as the submit button. Registering there
+        // keeps the strip on the submit button's row at every width: the host
+        // row is `flex-wrap: wrap`, so a strip inside `.tools` stayed on line one
+        // while `.trailing` wrapped to line two, which looked like the strip
+        // jumping upward. Sharing `.trailing` means the two wrap together.
+        ctx.slots.inject('conversation.input.right', () =>
           ctx.slots.register(
             {
-              name: 'conversation.input.left',
+              name: 'conversation.input.right',
               id: 'system-vitals',
               order: 0,
               locale: NS,

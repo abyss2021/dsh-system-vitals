@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-10-23
+
+### Fixed
+
+- The strip no longer appears to jump upward in a narrow window. It now registers
+  in `conversation.input.right`, inside the composer's `.trailing` flex cluster
+  together with the submit button. The host row is `flex-wrap: wrap` with
+  `.tools` and `.trailing` as siblings, so a strip inside `.tools` stayed on the
+  first line while the submit button wrapped to the second — which read as the
+  strip moving up. Sharing `.trailing` makes both wrap together.
+
+### Changed
+
+- Reading names are unchanged from 1.0.0 (CPU / 温度 / 内存 / 磁盘 / 上传 / 下载).
+- Dropped two locale keys (`settingsTitle`, `preview`) that no code path read.
+
 ## [1.3.0] - 2026-10-23
 
 ### Fixed

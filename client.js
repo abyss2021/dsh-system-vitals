@@ -33,6 +33,8 @@ window.__ModuleLoader__.load({
     const POLL_MS = 2000
     const ORDER_KEY = 'dsh-system-vitals:order'
     const VISIBLE_KEY = 'dsh-system-vitals:visible'
+    /** Reported by the layout diagnostics so a stale bundle is obvious. */
+    const VERSION = '1.3.8'
 
     /** Slot order and the identity of every metric; also the restore fallback. */
     const DEFAULT_ORDER = ['cpu', 'temperature', 'mem', 'disk', 'upload', 'download']
@@ -416,9 +418,11 @@ window.__ModuleLoader__.load({
      * reports 0 width from its own element while occupying ~200px — so the
      * branch residual (its real width minus ours) is what gets subtracted.
      *
-     * The residual is capped at 90px: the host collapses the model seat to an
-     * icon when the row runs out of room, so planning for its expanded label
-     * would starve the strip and then stop the host from ever collapsing it.
+     * The residual is capped at 150px: the host collapses the model seat to an
+     * icon when the row runs out of room, so planning for its fully expanded
+     * label (200px+) would starve the strip — but the collapsed seat plus the
+     * submit button still occupy ~116px, and capping below that made the strip
+     * underestimate the row and wrap.
      */
     function measureAvailable(element) {
       const container = findContainer(element)
@@ -435,7 +439,7 @@ window.__ModuleLoader__.load({
         if (branch.has(child)) {
           // Our own branch: subtract everything but the strip itself.
           const residual = Math.max(0, width - selfWidth)
-          const counted = Math.min(residual, 90)
+          const counted = Math.min(residual, 150)
           used += counted
           count += 1
           parts.push({ where: 'branch', tag: tagOf(child), w: Math.round(width), residual: Math.round(residual), counted: Math.round(counted) })
@@ -449,7 +453,7 @@ window.__ModuleLoader__.load({
       const style = typeof window.getComputedStyle === 'function' ? window.getComputedStyle(container) : null
       const gap = style === null ? 0 : Number.parseFloat(style.columnGap) || 0
       const gaps = Math.max(0, count - 1) * gap
-      const safety = 8
+      const safety = 4
       const available = container.clientWidth - used - gaps - safety
       return {
         available: Math.max(0, Math.floor(available)),
@@ -467,7 +471,7 @@ window.__ModuleLoader__.load({
     let reportTimer = 0
     let pendingReport = null
     function report(payload) {
-      pendingReport = { ...payload, version: '1.3.5' }
+      pendingReport = { ...payload, version: VERSION }
       if (reportTimer !== 0) return
       const schedule = window.setTimeout ?? setTimeout
       reportTimer = schedule(() => {
@@ -508,10 +512,23 @@ window.__ModuleLoader__.load({
             report({ stage: 'no-container' })
             return
           }
-          setCap(detail.available)
+          // Snap to whole cells: a partially visible reading looks like a bug,
+          // so the last cell is dropped instead of being cut in half.
+          const cell = element.children.length > 0
+            ? element.children[0].getBoundingClientRect().width
+            : 0
+          let limit = detail.available
+          if (cell > 0) {
+            const unit = cell + detail.gap
+            const fit = Math.floor((detail.available + detail.gap) / unit)
+            limit = fit > 0 ? Math.min(detail.available, fit * unit - detail.gap) : 0
+          }
+          setCap(limit)
           report({
             stage: 'measured',
             available: detail.available,
+            limit: Math.round(limit),
+            cell: Math.round(cell),
             row: detail.row,
             used: detail.used,
             gaps: detail.gaps,

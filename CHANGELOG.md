@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.8] - 2026-10-23
+
+### Fixed
+
+- Raised the branch-residual cap from 90px to 150px. The collapsed model seat
+  plus the submit button really occupy ~116px, so capping at 90 made the cap
+  underestimate the row by 26px and the row wrapped again in narrower windows.
+- The diagnostics report now carries the real bundle version instead of a stale
+  hard-coded string, so a browser running an old module is obvious at a glance.
+
 ## [1.3.7] - 2026-10-23
 
 ### Fixed

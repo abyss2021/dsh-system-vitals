@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.3] - 2026-10-23
+
+### Fixed
+
+- The strip stays on exactly one line, so resizing no longer moves the composer
+  controls vertically. Previously its cells wrapped onto a second line; the extra
+  line height grew the strip, and the centred trailing cluster shifted the
+  native controls on every resize.
+- A narrow row now keeps the **leading** readings and clips the tail, instead of
+  showing everything over two lines. A 12px gradient masks the cut edge so no
+  value is seen half-drawn.
+- Raised the width reserve to 260px, measured from the host controls (`+` 28 +
+  permission ~118 + compact model seat 24 + submit 34 + three 12px gaps). The
+  row holds a single line from a 320px row upward; the strip yields first.
+
 ## [1.3.2] - 2026-10-23
 
 ### Fixed

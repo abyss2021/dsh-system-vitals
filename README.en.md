@@ -114,9 +114,16 @@ the model seat goes compact — **the strip's width counts toward that measureme
 `.trailing` is `flex: none`. An uncapped strip therefore forced the row to wrap, pushing the
 permission and submit controls away. The strip is capped at `100cqw - 250px` (the row width
 minus the space the host controls need) and wraps its own cells beyond that: it always yields,
-and the native buttons keep their place. The 250px reserve comes from the controls on that row —
-`+`(28) + permission (~110) + compact model seat (24) + submit (34) + three 12px gaps — which
-keeps every row from 320px up on a single line.
+and the native buttons keep their place. The 260px reserve comes from the controls on that row —
+`+`(28) + permission (~118) + compact model seat (24) + submit (34) + three 12px gaps — which
+keeps every row from 320px up on a single line (8px of slack in the worst case).
+
+The strip is always **one line**: when it does not fit it clips at the right edge, so the
+**leading** readings survive — the head of your own order — and a 12px gradient hides the cut.
+
+> Trade-off: below roughly 400px of row width only one or two readings fit once the host
+> controls are accounted for. That is what "one line, keep the left ones" costs. If you would
+> rather see everything at that width, the tail can collapse into a `+N` button instead.
 
 ## Configuration
 

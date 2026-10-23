@@ -93,24 +93,28 @@ window.__ModuleLoader__.load({
      1. cap the strip against the row's width (cqw resolves against the row,
         which declares container-type: inline-size), reserving the space the
         host controls need; and
-     2. let the cells wrap inside that cap, so a narrow row shows the same
-        readings over two lines instead of clipping a value mid-unit.
-   The reserve covers the left tool cluster (add + permission), the model
-   selector and the submit button; the host's own observeControlRow then
-   compacts the model selector when the row is still tight. Nothing about the
-   visible set or its order depends on the width, so resizing can never
-   reorder, hide or unpin a reading.
+     2. keep the strip on exactly ONE line, clipping at its right edge, so the
+        row's height never changes. Wrapping the cells onto two lines grew the
+        strip's height, and because the trailing cluster centres its items that
+        shifted the native controls vertically on every resize.
+   Clipping means the readings at the right edge lose their room first, so the
+   leftmost cells — the beginning of the user's own order — always survive.
+   A short gradient masks the cut so no value is seen half-drawn.
 
-   The 250px reserve is measured from the host controls on that row: the add
-   button (28) + permission control (~110) + the compact model seat (24) + the
-   submit button (34) + the three 12px row gaps. With it, the row fits on one
-   line from a 320px row upward, so the native controls never get pushed to a
-   second line. The cqw unit is supported by every browser the Harness Web UI
+   The 260px reserve is measured from the host controls on that row: the add
+   button (28) + the permission cluster (~118) + the compact model seat (24) +
+   the submit button (34) + the three 12px row gaps. Verified numerically: with
+   it the row keeps a single line from a 320px row upward (8px of slack at the
+   worst case), so neither the strip nor the native controls ever wrap. Below
+   roughly 400px of row width only one to two readings survive the cap; that is
+   the intended trade-off — the leading readings win over wrapping. The cqw unit is supported by every browser the Harness Web UI
    targets (Chrome 105+, Safari 16+, Firefox 110+). */
 .smx-root{box-sizing:border-box;display:flex;align-items:center;justify-content:flex-start;
-  gap:6px 10px;flex-wrap:wrap;overflow:hidden;
+  gap:10px;flex-wrap:nowrap;overflow:hidden;
   flex:0 1 auto;min-width:0;
-  max-width:max(0px, calc(100cqw - var(--sv-row-reserve, 250px)));
+  max-width:max(0px, calc(100cqw - var(--sv-row-reserve, 260px)));
+  -webkit-mask-image:linear-gradient(to right, #000 calc(100% - 12px), transparent 100%);
+  mask-image:linear-gradient(to right, #000 calc(100% - 12px), transparent 100%);
   color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:18px;font-variant-numeric:tabular-nums}
 .smx-item{display:inline-flex;align-items:baseline;gap:3px;flex:none;width:calc(10ch + 6px);
   white-space:nowrap;

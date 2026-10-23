@@ -2,12 +2,12 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A520-339933)](https://nodejs.org)
-[![Platform](https://img.shields.io/badge/platform-Linux-6c757d)](#compatibility)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-6c757d)](#compatibility)
 
 **System vitals for DeepSeek Harness.** A single always-visible status line inside the
 composer tool row — right next to the permission control — showing **CPU load, CPU
-temperature, memory, disk and live upload/download throughput**. Sampled every second,
-zero runtime dependencies.
+temperature, memory, disk and live upload/download throughput** on Linux, macOS and
+Windows. Sampled every second, zero runtime dependencies.
 
 ```
 +  Auto review ⌄   CPU  2.8%  TEMP  41°C  MEM  14%  DISK  13%  UP  128K/s  DOWN  1.60M/s
@@ -54,16 +54,24 @@ dsh plugin --profile web remove dsh-system-vitals
 
 ## What it shows
 
-| Reading | Source | Notes |
-|---|---|---|
-| CPU load (total, per core) | `/proc/stat` | delta between two samples |
-| CPU temperature | `/sys/class/hwmon/*/name` (`coretemp`, `k10temp`, `zenpower`, `cpu_thermal`, …) → `temp1_input`; falls back to `/sys/class/thermal/thermal_zone*/temp` | prefers a CPU package sensor; shows `—` when unavailable |
-| Memory / swap | `/proc/meminfo` | the line shows the percentage; absolute usage is in the tooltip |
-| Disk usage | `fs.statfs('/')` | root volume |
-| Upload / download | `/proc/net/dev` counter deltas | virtual interfaces (`lo`, `veth`, `docker`, `br-`, `tun`, `wg`, …) excluded |
-| (Host-only extras) load average, task count, uptime | `/proc/loadavg`, `/proc`, `/proc/uptime` | present in the snapshot, not rendered today |
+| Reading | Linux | macOS | Windows |
+|---|---|---|---|
+| CPU load (total, per core) | `/proc/stat` deltas | Node `os.cpus()` time deltas | `Win32_PerfFormattedData_PerfOS_Processor` |
+| CPU temperature | `/sys/class/hwmon` (`coretemp`/`k10temp`/`zenpower`/`cpu_thermal`…), falling back to `/sys/class/thermal` | `powermetrics --samplers smc` (usually unreadable without root; falls back to `osx-cpu-temp`/`istats`) | `MSAcpi_ThermalZoneTemperature` (not exposed on most consumer boards, so often `—`) |
+| Memory / swap | `/proc/meminfo` | Node `os.totalmem/freemem` plus `sysctl vm.swapusage` | `Win32_PerfFormattedData_PerfOS_Memory` (swap reported as commit) |
+| Disk usage | `fs.statfs('/')` | `fs.statfs('/')` | `Win32_LogicalDisk` (system drive) |
+| Upload / download | `/proc/net/dev` deltas | `netstat -ib` deltas | `Bytes*Persec` from `Win32_PerfFormattedData_Tcpip_NetworkInterface` |
+| (Host-only extras) load average, task count, uptime | `/proc/loadavg`, `/proc`, `/proc/uptime` | `os.loadavg()` / `os.uptime()` | `NumberOfProcesses` / `LastBootUpTime` |
 
 The Host samples once a second; the Client polls `GET /system-vitals/api/snapshot` every two seconds.
+Anything a platform cannot read is returned as `null` and rendered as `—`; no value is invented.
+
+### Per-platform notes
+
+- **Linux**: plain file reads — no subprocess, no dependency.
+- **macOS**: short `sysctl`/`netstat` calls plus Node APIs; the temperature probe is expensive, so it refreshes every fifth sample and is cached between them.
+- **Windows**: one long-lived PowerShell child streams one JSON line per second (the performance counters already report percentages and per-second byte rates, so no deltas are needed). If the child exits it restarts after a five-second backoff and the last sample is reused meanwhile.
+- Any other platform falls back to a minimal Node-only reading (memory, load, uptime); CPU load and throughput render `—`.
 
 ## Narrow windows
 
@@ -92,7 +100,7 @@ Override the row's `config` in the profile patch layer:
 
 ## Compatibility
 
-- **Platform**: Linux (`/proc` and `/sys`; other platforms will show gaps).
+- **Platform**: full support on Linux; macOS and Windows cover CPU, memory, disk and throughput, with temperature depending on the model and permissions.
 - **DSH**: developed and verified on `0.2.1-rc.2`, using only stable
   `webServer.register`, `ctx.slots.register/inject` and `ctx.locale.register` APIs.
 - **Node**: ≥ 20 (`fs.statfs`).

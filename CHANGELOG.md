@@ -4,6 +4,39 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-10-23
+
+### Added
+
+- macOS support: CPU and per-core load from Node `os.cpus()` deltas, memory from
+  `os.totalmem/freemem`, swap from `sysctl vm.swapusage`, throughput from
+  `netstat -ib`, disk from `fs.statfs`. CPU temperature uses `powermetrics`
+  (SMC) when readable without root, falling back to `osx-cpu-temp`/`istats`,
+  refreshed every fifth sample and cached in between.
+- Windows support: one long-lived PowerShell child streams a JSON sample per
+  second from the `Win32_PerfFormattedData_*` classes, which already report
+  percentages and per-second byte rates. The child restarts with a five-second
+  backoff on exit, and static host facts are captured once per child.
+- A minimal Node-only fallback source for any other platform.
+- Platform sources live under `platform/` (`linux.js`, `darwin.js`, `win32.js`,
+  `shared.js`); the Host entry selects one by `process.platform` and the
+  snapshot route now reports the platform.
+- `supportedPlatforms` export listing the platforms with a dedicated source.
+
+### Fixed
+
+- The upload/download unit cell clipped its trailing `s` (`K/s` rendered as
+  `K/`). The value cell is now 3ch and the unit cell 3ch, keeping the strip
+  width unchanged while giving the unit room for three characters.
+- Rate formatting stepped up units at 1024, so `1023 B/s` printed four
+  characters and could overflow its cell; scaling now steps at 1000 and the
+  scaled value is capped at 999.
+
+### Changed
+
+- READMEs document the per-platform reading sources and their limits; the
+  compatibility and badge sections now advertise Linux, macOS and Windows.
+
 ## [1.0.0] - 2026-10-22
 
 First public release.

@@ -2,10 +2,10 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A520-339933)](https://nodejs.org)
-[![Platform](https://img.shields.io/badge/platform-Linux-6c757d)](#兼容性)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-6c757d)](#兼容性)
 
 **DeepSeek Harness 的系统体征插件** —— 在输入框卡片内部工具行、紧贴「自动审查」右侧，常驻显示
-**CPU 占用、CPU 温度、内存、磁盘、实时上传/下载速率**，每秒采样，零运行时依赖。
+**CPU 占用、CPU 温度、内存、磁盘、实时上传/下载速率**；Linux / macOS / Windows 三平台，每秒采样，零运行时依赖。
 
 ```
 +  自动审查 ⌄   CPU  2.8%  温度  41°C  内存  14%  磁盘  13%  上传  128K/s  下载  1.60M/s
@@ -16,7 +16,7 @@
 ## 特性
 
 - **一条极简状态行**：`CPU · 温度 · 内存 · 磁盘 · 上传 · 下载`，全部常驻可见。
-- **零依赖、零命令**：直接读 Linux 内核计数器（`/proc`、`/sys`），不调用 `top`/`ps`/`nvidia-smi`，不装原生模块。
+- **零依赖**：Linux 直接读内核计数器（`/proc`、`/sys`）；macOS 用系统自带 `sysctl`/`netstat`；Windows 用常驻 PowerShell 读性能计数器。不装原生模块、不需要管理员权限。
 - **等宽格子、绝不跳动**：每个读数是 `标签 4ch + 数字 3.5ch + 单位 2.5ch` 的定宽格子，数值从 `9%` 变 `10%` 时整条不会左右晃。
 - **数字最多 3 位有效数字**：放不下就换单位（网速 `B/s → K/s → M/s → G/s`），绝不撑宽格子。
 - **阈值变色**：CPU/内存 75% 起警示色、90% 起错误色；磁盘 85% / 95%；温度 80°C / 92°C。
@@ -46,16 +46,23 @@ dsh plugin --profile web remove dsh-system-vitals
 
 ## 显示内容
 
-| 指标 | 来源 | 备注 |
-|---|---|---|
-| CPU 总占用 / 单核占用 | `/proc/stat` | 两次采样求差 |
-| CPU 温度 | `/sys/class/hwmon/*/name`（`coretemp`、`k10temp`、`zenpower`、`cpu_thermal`…）→ `temp1_input`；回退 `/sys/class/thermal/thermal_zone*/temp` | 优先 CPU package 传感器；读不到显示 `—` |
-| 内存 / 交换 | `/proc/meminfo` | 主行只显示占用率；绝对用量在悬浮提示里 |
-| 磁盘占用 | `fs.statfs('/')` | 根卷 |
-| 上传 / 下载速率 | `/proc/net/dev` 累计字节差分 | 已排除 `lo`、`veth`、`docker`、`br-`、`tun`、`wg` 等虚拟接口 |
-| （Host 侧附带）负载、进程数、运行时长 | `/proc/loadavg`、`/proc`、`/proc/uptime` | 当前 UI 未展示，保留在快照里 |
+| 指标 | Linux | macOS | Windows |
+|---|---|---|---|
+| CPU 总占用 / 单核占用 | `/proc/stat` 两次采样求差 | Node `os.cpus()` 时间片差分 | `Win32_PerfFormattedData_PerfOS_Processor` |
+| CPU 温度 | `/sys/class/hwmon`（`coretemp`/`k10temp`/`zenpower`/`cpu_thermal`…）→ 回退 `/sys/class/thermal` | `powermetrics --samplers smc`（无 sudo 时通常不可读；回退 `osx-cpu-temp`/`istats`） | `MSAcpi_ThermalZoneTemperature`（多数消费级主板不暴露，故常为 `—`） |
+| 内存 / 交换 | `/proc/meminfo` | Node `os.totalmem/freemem` + `sysctl vm.swapusage` | `Win32_PerfFormattedData_PerfOS_Memory`（交换取 commit 量） |
+| 磁盘占用 | `fs.statfs('/')` | `fs.statfs('/')` | `Win32_LogicalDisk`（系统盘） |
+| 上传 / 下载速率 | `/proc/net/dev` 累计差分 | `netstat -ib` 累计差分 | `Win32_PerfFormattedData_Tcpip_NetworkInterface` 的 `Bytes*Persec` |
+| （Host 侧附带）负载、进程数、运行时长 | `/proc/loadavg`、`/proc`、`/proc/uptime` | `os.loadavg()` / `os.uptime()` | `NumberOfProcesses` / `LastBootUpTime` |
 
-Host 每秒采样一次，Client 每 2 秒轮询 `GET /system-vitals/api/snapshot`。
+Host 每秒采样一次，Client 每 2 秒轮询 `GET /system-vitals/api/snapshot`。读不到的字段一律返回 `null`，界面显示 `—`，不会编造数值。
+
+### 各平台实现要点
+
+- **Linux**：纯文件读取，零子进程、零依赖。
+- **macOS**：`sysctl`/`netstat` 短命令 + Node API；温度采样较贵，每 5 个采样点刷新一次并缓存。
+- **Windows**：启动一个常驻 PowerShell 子进程，每秒输出一行 JSON（性能计数器本身已是百分比与每秒字节，无需差分）；子进程退出后按 5 秒退避重启，期间沿用上一次采样。
+- 其他平台回退到 Node `os` 的最小读数（内存、负载、运行时长），CPU 占用与网速显示 `—`。
 
 ## 窄屏行为
 
@@ -83,7 +90,7 @@ Host 每秒采样一次，Client 每 2 秒轮询 `GET /system-vitals/api/snapsho
 
 ## 兼容性
 
-- **平台**：Linux（读取 `/proc` 与 `/sys`；macOS/Windows 上会缺数据，不建议使用）。
+- **平台**：Linux 完整支持；macOS、Windows 支持 CPU/内存/磁盘/网速，温度视机型与权限可能不可用。
 - **DSH**：在 `0.2.1-rc.2` 上开发并验证；只使用稳定的 `webServer.register`、
   `ctx.slots.register/inject`、`ctx.locale.register` 接口。
 - **Node**：≥ 20（`fs.statfs`）。

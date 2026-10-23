@@ -51,10 +51,13 @@ window.__ModuleLoader__.load({
 .smx-root{box-sizing:border-box;display:flex;align-items:center;justify-content:flex-start;gap:10px;
   flex:0 1 auto;min-width:0;overflow:hidden;
   color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:18px;font-variant-numeric:tabular-nums}
+/* Cells total 10ch so the strip keeps its width: label 4ch, value 3ch, unit 3ch.
+   The unit cell must fit three characters such as K/s and M/s, so the value
+   cell gives up the half character instead of clipping a trailing s. */
 .smx-item{display:inline-flex;align-items:baseline;gap:3px;flex:none;width:calc(10ch + 6px)}
 .smx-key{flex:none;width:4ch;overflow:hidden;text-align:right;color:var(--dsw-alias-label-tertiary)}
-.smx-val{flex:none;width:3.5ch;text-align:right;color:var(--dsw-alias-label-secondary);font-weight:500}
-.smx-unit{flex:none;width:2.5ch;overflow:hidden;text-align:left;color:var(--dsw-alias-label-tertiary)}
+.smx-val{flex:none;width:3ch;text-align:right;color:var(--dsw-alias-label-secondary);font-weight:500}
+.smx-unit{flex:none;width:3ch;text-align:left;white-space:nowrap;color:var(--dsw-alias-label-tertiary)}
 .smx-wait{flex:none;white-space:nowrap;color:var(--dsw-alias-label-tertiary);opacity:.85}
 /* The composer tool row is itself an inline-size container, so these queries
    measure the card width (not our own, which is content-sized). Narrow cards
@@ -88,7 +91,11 @@ window.__ModuleLoader__.load({
       return { number: String(Math.round(value)), unit: '°C' }
     }
 
-    /** Pick the unit that keeps the number inside three significant digits. */
+    /**
+     * Pick the unit that keeps the number inside the three-character value cell.
+     * Stepping up at 1000 (not at the binary 1024) matters: `1023 B/s` would
+     * otherwise print four characters and overflow its cell.
+     */
     function splitRate(bytesPerSecond) {
       if (!Number.isFinite(bytesPerSecond) || bytesPerSecond < 0) return { number: '—', unit: 'B/s' }
       const units = [
@@ -98,8 +105,8 @@ window.__ModuleLoader__.load({
         ['G/s', 1024 ** 3],
       ]
       let index = 0
-      while (index < units.length - 1 && bytesPerSecond >= units[index + 1][1]) index += 1
-      const scaled = bytesPerSecond / units[index][1]
+      while (index < units.length - 1 && bytesPerSecond / units[index][1] >= 1000) index += 1
+      const scaled = Math.min(999, bytesPerSecond / units[index][1])
       return { number: threeDigits(scaled), unit: units[index][0] }
     }
 

@@ -101,6 +101,31 @@ class Sampler {
   }
 }
 
+/** Read and parse a bounded JSON request body. */
+function readBody(request) {
+  return new Promise((resolve) => {
+    let size = 0
+    const chunks = []
+    request.on('data', (chunk) => {
+      size += chunk.length
+      if (size > 64 * 1024) {
+        resolve(null)
+        request.destroy()
+        return
+      }
+      chunks.push(chunk)
+    })
+    request.on('end', () => {
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')))
+      } catch {
+        resolve(null)
+      }
+    })
+    request.on('error', () => resolve(null))
+  })
+}
+
 function sendJson(response, status, body) {
   response.writeHead(status, {
     'content-type': 'application/json; charset=utf-8',
@@ -120,13 +145,31 @@ export function apply(ctx, config = {}) {
     return () => sampler.dispose()
   }, 'dsh-system-vitals: sampler')
 
+  // Diagnostics: the Client reports what it measured for the composer row, so a
+  // layout problem can be diagnosed from the Host instead of guessing at it.
+  let lastMeasure = null
+
   ctx.effect(
     () =>
       ctx.webServer.register({
         kind: 'prefix',
         path: API_PREFIX,
-        handler: (request, response) => {
+        handler: async (request, response) => {
           const url = new URL(request.url ?? '/', 'http://127.0.0.1')
+          if (url.pathname === `${API_PREFIX}/measure`) {
+            if ((request.method ?? 'GET') === 'POST') {
+              const body = await readBody(request)
+              if (body === null) {
+                sendJson(response, 400, { error: 'bad-body' })
+                return
+              }
+              lastMeasure = { at: Date.now(), ...body }
+              sendJson(response, 200, { ok: true })
+              return
+            }
+            sendJson(response, 200, { measure: lastMeasure })
+            return
+          }
           if (url.pathname !== `${API_PREFIX}/snapshot`) {
             sendJson(response, 404, { error: 'not-found' })
             return

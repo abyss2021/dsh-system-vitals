@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.5] - 2026-10-23
+
+### Added
+
+- A diagnostics route: the Client posts what it measured for the composer row
+  (`GET /system-vitals/api/measure` returns the last report). It exists because
+  the width cap could not be reproduced from the Host side, and guessing at the
+  layout was costing more than instrumenting it. Requires no configuration and
+  never affects rendering.
+
 ## [1.3.4] - 2026-10-23
 
 ### Fixed

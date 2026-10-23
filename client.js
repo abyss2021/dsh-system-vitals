@@ -442,7 +442,36 @@ window.__ModuleLoader__.load({
       const style = typeof window.getComputedStyle === 'function' ? window.getComputedStyle(container) : null
       const gap = style === null ? 0 : Number.parseFloat(style.columnGap) || 0
       const available = container.clientWidth - used - count * gap - 4
-      return Math.max(0, Math.floor(available))
+      return {
+        available: Math.max(0, Math.floor(available)),
+        row: container.clientWidth,
+        used: Math.round(used),
+        gaps: Math.round(count * gap + 4),
+        tag: `${container.tagName.toLowerCase()}.${(container.className || '').toString().split(' ')[0]}`,
+      }
+    }
+
+    /** Fire-and-forget diagnostic: which numbers produced the current cap. */
+    let reportTimer = 0
+    let pendingReport = null
+    function report(payload) {
+      pendingReport = { ...payload, version: '1.3.5' }
+      if (reportTimer !== 0) return
+      const schedule = window.setTimeout ?? setTimeout
+      reportTimer = schedule(() => {
+        reportTimer = 0
+        const body = JSON.stringify(pendingReport)
+        try {
+          void fetch(`${ENDPOINT.replace('/snapshot', '/measure')}`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body,
+            keepalive: true,
+          }).catch(() => {})
+        } catch {
+          /* Diagnostics must never break the strip. */
+        }
+      }, 250)
     }
 
     function MetricsBar(props) {
@@ -461,8 +490,23 @@ window.__ModuleLoader__.load({
         const element = rootRef.current
         if (element === null) return undefined
         const measure = () => {
-          const available = measureAvailable(element)
-          if (available !== null) setCap(available)
+          if (typeof element.getBoundingClientRect !== 'function') return
+          const detail = measureAvailable(element)
+          if (detail === null) {
+            report({ stage: 'no-container' })
+            return
+          }
+          setCap(detail.available)
+          report({
+            stage: 'measured',
+            available: detail.available,
+            row: detail.row,
+            used: detail.used,
+            gaps: detail.gaps,
+            natural: Math.round(element.scrollWidth),
+            rendered: Math.round(element.getBoundingClientRect().width),
+            container: detail.tag,
+          })
         }
         measure()
         if (typeof ResizeObserver !== 'function') return undefined

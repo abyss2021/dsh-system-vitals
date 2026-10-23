@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.13] - 2026-10-23
+
+### Fixed
+
+- The strip keeps its fifth reading at a 1280px viewport again. 1.3.12 started
+  measuring against the row's content box, which is correct, but it kept the
+  12px safety margin that had been raised back when the budget still included
+  the row's 16px of horizontal padding — so the margin was really -4px and the
+  host flipped its compact mode; with the corrected basis, 12px left 368px
+  against a 370px five-cell snap and cost one reading. The margin is now a
+  genuine 8px: measured 370px of budget at a 1280px viewport, five readings,
+  and still no painted overflow frame.
+
 ## [1.3.12] - 2026-10-23
 
 ### Removed

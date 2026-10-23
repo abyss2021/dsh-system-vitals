@@ -36,7 +36,7 @@ window.__ModuleLoader__.load({
     const ORDER_KEY = 'dsh-system-vitals:order'
     const VISIBLE_KEY = 'dsh-system-vitals:visible'
     /** Reported by the layout diagnostics so a stale bundle is obvious. */
-    const VERSION = '1.3.12'
+    const VERSION = '1.3.13'
 
     /** Slot order and the identity of every metric; also the restore fallback. */
     const DEFAULT_ORDER = ['cpu', 'temperature', 'mem', 'disk', 'upload', 'download']
@@ -464,7 +464,12 @@ window.__ModuleLoader__.load({
       const style = typeof window.getComputedStyle === 'function' ? window.getComputedStyle(container) : null
       const gap = style === null ? 0 : Number.parseFloat(style.columnGap) || 0
       const gaps = Math.max(0, count - 1) * gap
-      const safety = 12
+      // Real margin now, not a fudged one: the 12px this replaced was raised
+      // while the budget still included the row's padding, so the effective
+      // margin was 12 - 16 = -4px. With the content box as the basis, 8px of
+      // genuine slack is enough to absorb sub-pixel rounding and still leaves
+      // the whole-cell snap its room (12px cost the fifth reading at 1280px).
+      const safety = 8
       const padX = style === null
         ? 0
         : (Number.parseFloat(style.paddingLeft) || 0) + (Number.parseFloat(style.paddingRight) || 0)

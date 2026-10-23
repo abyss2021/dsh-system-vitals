@@ -117,7 +117,7 @@ its own cells beyond it: it always yields, and the native buttons keep their pla
 
 The cap is measured at runtime rather than hardcoded: a `ResizeObserver` reads the row's
 **content box** — the same box the host compares its own "does it fit" sum against — subtracts
-every control outside the strip's own ancestor branch plus the gaps, and keeps a 12px safety
+every control outside the strip's own ancestor branch plus the gaps, and keeps an 8px safety
 margin. The model seat counts at its compact width, because the host collapses it to an icon
 when space runs short — planning for its expanded label starved the strip and then prevented
 the host from ever compacting.

@@ -29,7 +29,7 @@
 
 ```bash
 # 1. 从 GitHub 安装
-dsh plugin --profile web add github:<your-account>/dsh-system-vitals
+dsh plugin --profile web add github:abyss2021/dsh-system-vitals
 
 # 2. 或从本地目录安装（开发调试）
 dsh plugin --profile web add /path/to/dsh-system-vitals

@@ -35,7 +35,7 @@ Requires DSH around `0.2.1-rc.2`, Node ≥ 20, and a profile with the Web UI (`d
 
 ```bash
 # from GitHub
-dsh plugin --profile web add github:<your-account>/dsh-system-vitals
+dsh plugin --profile web add github:abyss2021/dsh-system-vitals
 
 # or from a local checkout
 dsh plugin --profile web add /path/to/dsh-system-vitals

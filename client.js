@@ -36,7 +36,7 @@ window.__ModuleLoader__.load({
     const ORDER_KEY = 'dsh-system-vitals:order'
     const VISIBLE_KEY = 'dsh-system-vitals:visible'
     /** Reported by the layout diagnostics so a stale bundle is obvious. */
-    const VERSION = '1.3.13'
+    const VERSION = '1.3.14'
 
     /** Slot order and the identity of every metric; also the restore fallback. */
     const DEFAULT_ORDER = ['cpu', 'temperature', 'mem', 'disk', 'upload', 'download']

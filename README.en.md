@@ -59,7 +59,7 @@ dsh plugin --profile web remove dsh-system-vitals
 |---|---|---|---|
 | CPU load (total, per core) | `/proc/stat` deltas | Node `os.cpus()` time deltas | `Win32_PerfFormattedData_PerfOS_Processor` |
 | CPU temperature | `/sys/class/hwmon` (`coretemp`/`k10temp`/`zenpower`/`cpu_thermal`…), falling back to `/sys/class/thermal` | `powermetrics --samplers smc` (usually unreadable without root; falls back to `osx-cpu-temp`/`istats`) | `MSAcpi_ThermalZoneTemperature` (not exposed on most consumer boards, so often `—`) |
-| Memory / swap | `/proc/meminfo` | Node `os.totalmem/freemem` plus `sysctl vm.swapusage` | `Win32_PerfFormattedData_PerfOS_Memory` (swap reported as commit) |
+| Memory / swap | `/proc/meminfo` | Node `os.totalmem/freemem` plus `sysctl vm.swapusage` | total from `Win32_OperatingSystem.TotalVisibleMemorySize`, available from `PerfOS_Memory.AvailableKBytes` (swap from `CommitLimit` / `CommittedBytes`) |
 | Disk usage | `fs.statfs('/')` | `fs.statfs('/')` | `Win32_LogicalDisk` (system drive) |
 | Upload / download | `/proc/net/dev` deltas | `netstat -ib` deltas | `Bytes*Persec` from `Win32_PerfFormattedData_Tcpip_NetworkInterface` |
 | (Host-only extras) load average, task count, uptime | `/proc/loadavg`, `/proc`, `/proc/uptime` | `os.loadavg()` / `os.uptime()` | `NumberOfProcesses` / `LastBootUpTime` |

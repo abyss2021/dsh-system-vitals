@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.14] - 2026-10-24
+
+### Fixed
+
+- Windows reported a permanent `0%` for memory. `platform/win32.js` read
+  `TotalVisibleMemorySize` and `AvailableKB` from
+  `Win32_PerfFormattedData_PerfOS_Memory`, where neither exists: the total lives
+  on `Win32_OperatingSystem` (also in KB), and the available counter is
+  `AvailableKBytes` (`AvailableBytes` / `AvailableMBytes` are the other
+  spellings). Both reads returned `$null`, `[double]` turned that into 0, and
+  `total = 0` pinned the percentage to 0 — CPU, disk, network and temperature
+  were unaffected, which is what made it look like an idle machine. Reported on
+  Windows 10 22H2 (10.0.19045) with an i5-12600KF; the two corrected reads come
+  from objects the loop already queried, so there is no extra WMI call.
+- A sample that cannot report memory now yields `null` fields, rendered as `—`,
+  instead of a confident `0%` — a future sampler break shows up as "unknown"
+  rather than as a healthy idle host.
+- The raw-sample-to-snapshot mapping moved into an exported
+  `sampleToSnapshot()`, so the Windows mapping can be checked without Windows.
+
 ## [1.3.13] - 2026-10-23
 
 ### Fixed

@@ -52,7 +52,7 @@ dsh plugin --profile web remove dsh-system-vitals
 |---|---|---|---|
 | CPU 总占用 / 单核占用 | `/proc/stat` 两次采样求差 | Node `os.cpus()` 时间片差分 | `Win32_PerfFormattedData_PerfOS_Processor` |
 | CPU 温度 | `/sys/class/hwmon`（`coretemp`/`k10temp`/`zenpower`/`cpu_thermal`…）→ 回退 `/sys/class/thermal` | `powermetrics --samplers smc`（无 sudo 时通常不可读；回退 `osx-cpu-temp`/`istats`） | `MSAcpi_ThermalZoneTemperature`（多数消费级主板不暴露，故常为 `—`） |
-| 内存 / 交换 | `/proc/meminfo` | Node `os.totalmem/freemem` + `sysctl vm.swapusage` | `Win32_PerfFormattedData_PerfOS_Memory`（交换取 commit 量） |
+| 内存 / 交换 | `/proc/meminfo` | Node `os.totalmem/freemem` + `sysctl vm.swapusage` | 总量取 `Win32_OperatingSystem.TotalVisibleMemorySize`，可用取 `PerfOS_Memory.AvailableKBytes`（交换取 `CommitLimit` / `CommittedBytes`） |
 | 磁盘占用 | `fs.statfs('/')` | `fs.statfs('/')` | `Win32_LogicalDisk`（系统盘） |
 | 上传 / 下载速率 | `/proc/net/dev` 累计差分 | `netstat -ib` 累计差分 | `Win32_PerfFormattedData_Tcpip_NetworkInterface` 的 `Bytes*Persec` |
 | （Host 侧附带）负载、进程数、运行时长 | `/proc/loadavg`、`/proc`、`/proc/uptime` | `os.loadavg()` / `os.uptime()` | `NumberOfProcesses` / `LastBootUpTime` |

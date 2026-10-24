@@ -49,6 +49,16 @@ while ($true) {
       if ($tz) { $tempC = [math]::Round(($tz.HighPrecisionTemperature / 10) - 273.15, 1) }
     } catch {}
   }
+  # Memory properties are not where they look like they are:
+  # Win32_PerfFormattedData_PerfOS_Memory has no TotalVisibleMemorySize (that is
+  # Win32_OperatingSystem's, in KB) and no AvailableKB (the per-instance counter
+  # is AvailableKBytes; AvailableBytes / AvailableMBytes are the other spellings).
+  # Reading the wrong names yields $null, which [double] turns into 0 — that is
+  # how memory used to report a permanent 0%.
+  $memTotalKB = [double]$osInfo.TotalVisibleMemorySize
+  $memFreeKB = [double]$m.AvailableKBytes
+  if (-not $memFreeKB) { $memFreeKB = [double]$m.AvailableBytes / 1024 }
+  if (-not $memFreeKB) { $memFreeKB = [double]$osInfo.FreePhysicalMemory }
   $uptime = [double]([DateTime]::Now - $osInfo.LastBootUpTime).TotalSeconds
   $obj = [ordered]@{
     t = [int64](([DateTimeOffset]::Now).ToUnixTimeMilliseconds())
@@ -56,8 +66,8 @@ while ($true) {
     perCore = $perCore
     cpuName = $cpuName
     cores = [int]$cores
-    memTotalKB = [double]$m.TotalVisibleMemorySize
-    memFreeKB = [double]$m.AvailableKB
+    memTotalKB = $memTotalKB
+    memFreeKB = $memFreeKB
     committedKB = [double]$m.CommittedBytes / 1024
     commitLimitKB = [double]$m.CommitLimit / 1024
     diskTotal = [double]$disk.Size
@@ -135,46 +145,61 @@ export function createSource() {
     async read() {
       ensureChild()
       if (latest === null) return null
-
-      const memoryTotal = latest.memTotalKB * 1024
-      const memoryFree = latest.memFreeKB * 1024
-      const swapTotal = latest.commitLimitKB * 1024
-      const swapUsed = latest.committedKB * 1024
-      const perCore = Array.isArray(latest.perCore) ? latest.perCore : []
-
-      return {
-        t: latest.t,
-        host: os.hostname(),
-        cpu: {
-          percent: Number(latest.cpuPercent) || 0,
-          perCore,
-          cores: Number(latest.cores) || perCore.length || os.cpus().length,
-          model: latest.cpuName ?? undefined,
-        },
-        mem: {
-          total: memoryTotal,
-          used: Math.max(0, memoryTotal - memoryFree),
-          percent: memoryTotal > 0 ? ((memoryTotal - memoryFree) / memoryTotal) * 100 : 0,
-          swapTotal,
-          swapUsed,
-        },
-        load: os.loadavg(),
-        running: 0,
-        tasks: 0,
-        count: Number.isFinite(latest.processes) ? latest.processes : null,
-        uptime: Number(latest.uptime) || 0,
-        disk:
-          Number(latest.diskTotal) > 0
-            ? {
-                total: latest.diskTotal,
-                free: latest.diskFree,
-                used: Math.max(0, latest.diskTotal - latest.diskFree),
-                percent: ((latest.diskTotal - latest.diskFree) / latest.diskTotal) * 100,
-              }
-            : null,
-        temperature: Number.isFinite(latest.tempC) ? latest.tempC : null,
-        net: { rx: Number(latest.netRx) || 0, tx: Number(latest.netTx) || 0 },
-      }
+      return sampleToSnapshot(latest)
     },
+  }
+}
+
+/**
+ * Map one raw PowerShell sample onto the plugin's snapshot shape.
+ *
+ * Exported so the mapping can be exercised off Windows: only the sampling child
+ * is platform-specific, and a wrong CIM property name degrades silently to zero
+ * — which is exactly the bug that made memory report a permanent 0%. Anything
+ * the sample does not carry is reported as `null` (the UI renders `—`) rather
+ * than a confident zero.
+ */
+export function sampleToSnapshot(latest) {
+  const totalKB = Number(latest.memTotalKB)
+  const freeKB = Number(latest.memFreeKB)
+  const memoryTotal = Number.isFinite(totalKB) && totalKB > 0 ? totalKB * 1024 : 0
+  const memoryFree = Number.isFinite(freeKB) && freeKB > 0 ? Math.min(freeKB * 1024, memoryTotal) : 0
+  const memoryKnown = memoryTotal > 0
+  const perCore = Array.isArray(latest.perCore) ? latest.perCore : []
+  const diskTotal = Number(latest.diskTotal)
+  const diskFree = Number(latest.diskFree)
+
+  return {
+    t: latest.t,
+    host: os.hostname(),
+    cpu: {
+      percent: Number(latest.cpuPercent) || 0,
+      perCore,
+      cores: Number(latest.cores) || perCore.length || os.cpus().length,
+      model: latest.cpuName ?? undefined,
+    },
+    mem: {
+      total: memoryKnown ? memoryTotal : null,
+      used: memoryKnown ? Math.max(0, memoryTotal - memoryFree) : null,
+      percent: memoryKnown ? ((memoryTotal - memoryFree) / memoryTotal) * 100 : null,
+      swapTotal: (Number(latest.commitLimitKB) || 0) * 1024,
+      swapUsed: (Number(latest.committedKB) || 0) * 1024,
+    },
+    load: os.loadavg(),
+    running: 0,
+    tasks: 0,
+    count: Number.isFinite(latest.processes) ? latest.processes : null,
+    uptime: Number(latest.uptime) || 0,
+    disk:
+      Number.isFinite(diskTotal) && diskTotal > 0
+        ? {
+            total: diskTotal,
+            free: diskFree,
+            used: Math.max(0, diskTotal - diskFree),
+            percent: ((diskTotal - diskFree) / diskTotal) * 100,
+          }
+        : null,
+    temperature: Number.isFinite(latest.tempC) ? latest.tempC : null,
+    net: { rx: Number(latest.netRx) || 0, tx: Number(latest.netTx) || 0 },
   }
 }

@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.17] - 2026-11-06
+
+### Added
+
+- `exports` gains `"./package.json"`. Tooling that reads a package's manifest
+  metadata through its `exports` map failed to resolve it without that entry;
+  adding it leaves every existing entry point untouched.
+
 ## [1.3.16] - 2026-11-06
 
 ### Added

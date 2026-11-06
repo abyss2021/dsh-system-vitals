@@ -127,10 +127,21 @@ React 的状态更新要到下一个任务才提交，那时这一帧已经画�
 
 ## 兼容性
 
+兼容范围声明在 `package.json` 里，工具链直接读它，不必翻文档：
+
+| 字段 | 值 | 含义 |
+| --- | --- | --- |
+| `engines.node` | `>=20` | 最低 Node（`fs.statfs` 要求） |
+| `engines.dsh` | `>=0.2.1-0 <0.3.0-0` | 支持的 DSH 版本区间 |
+| `dsh.compatibility.dsh` | `0.2.1-rc.2` | 开发与验证基线 |
+| `dsh.compatibility.profiles` | `["web"]` | 只适用于带 Web 界面的 profile |
+| `dsh.compatibility.dshReleases` | `0.2.1-rc.2` / `0.2.2-rc.1` | 逐版本实测结果 |
+
 - **平台**：Linux 完整支持；macOS、Windows 支持 CPU/内存/磁盘/网速，温度视机型与权限可能不可用。
-- **DSH**：在 `0.2.1-rc.2` 上开发并验证；只使用稳定的 `webServer.register`、
+- **DSH**：在 `0.2.1-rc.2` 上开发并验证，`0.2.2-rc.1` 复测通过；只使用稳定的 `webServer.register`、
   `ctx.slots.register/inject`、`ctx.locale.register` 接口。
 - **Node**：≥ 20（`fs.statfs`）。
+- **安装 / 启动 / 卸载证据**：见 [docs/verification.md](docs/verification.md)（一次性 profile 上的完整实测记录）。
 
 ## 安全说明
 

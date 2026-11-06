@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.16] - 2026-11-06
+
+### Added
+
+- The manifest now declares its compatibility ranges, so tooling can answer
+  "does this run here?" without reading prose: `engines.node` (`>=20`),
+  `engines.dsh` (`>=0.2.1-0 <0.3.0-0`), and `dsh.compatibility` with the
+  `0.2.1-rc.2` baseline, `profiles: ["web"]`, and per-release verdicts for
+  `0.2.1-rc.2` and `0.2.2-rc.1`.
+- `docs/verification.md`: install, start and uninstall on a disposable
+  `DSH_HOME` — bundle registration, the `/system-vitals/api/snapshot` route
+  returning live numbers, the client chunk carrying the module id and both
+  mount points (`conversation.input.right`, `settings.section`), and the
+  cleanup after removal. `files` now ships `docs/*.md` alongside the preview.
+
 ## [1.3.15] - 2026-11-06
 
 ### Fixed

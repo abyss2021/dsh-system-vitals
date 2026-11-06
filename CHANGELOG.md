@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.15] - 2026-11-06
+
+### Fixed
+
+- The trailing unit of the last visible reading could be sliced in half — most
+  visibly `下载 1.4 M/s`, where the `s` lost its right side. A cell reserves
+  `3ch` for its unit, but glyph advance exceeds that box for `M/s` (18.84px of
+  text against a 17.78px box in the UI font), so the unit spills ~1.6px past the
+  cell border. The strip's own `overflow:hidden` then cut it, because the cap
+  landed exactly on that border and the strip had no room to its right. The
+  strip now carries a 4px right padding that the cap accounts for, so the tail
+  unit's advance has somewhere to paint. Measured on a live composer row:
+  cap 366px → 370px, rendered 366px → 370px, `M/s` renders whole.
+- The cap is now chosen from the real cell rectangles instead of
+  `fit * (cell + gap) - gap`. That arithmetic resolved `ch` from one measured
+  cell and the gap, so it landed a pixel or two short of the true content width
+  — the residue that turned the spill above into a visible cut.
+- The cap no longer keeps a partially visible reading. It used to keep a cell
+  whose right edge fell short of the cap whenever at least half of it was
+  visible; snapping to the last cell that fully fits is what the README has
+  always promised ("the cut always lands between two cells").
+
 ## [1.3.14] - 2026-10-24
 
 ### Fixed

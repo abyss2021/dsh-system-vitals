@@ -123,6 +123,11 @@ window.__ModuleLoader__.load({
   gap:10px;flex-wrap:nowrap;overflow:hidden;
   flex:0 1 auto;min-width:0;
   max-width:100%;
+  /* Room for the tail unit's glyph advance. A cell reserves 3ch for its unit, but
+     "M/s" runs ~1.6px wider than that box in the UI font, so the last visible
+     reading would otherwise have its unit sliced by the strip's own clip exactly
+     at the cell border. The cap in measure() carries the same 4px. */
+  padding:0 4px 0 0;
   color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:18px;font-variant-numeric:tabular-nums}
 .smx-item{display:inline-flex;align-items:baseline;gap:3px;flex:none;width:calc(10ch + 6px);
   white-space:nowrap;
@@ -401,6 +406,38 @@ window.__ModuleLoader__.load({
 
     const tagOf = (element) => `${element.tagName.toLowerCase()}.${String(element.className || '').split(' ')[0]}`
 
+    /**
+     * Right edge of the last reading that fully fits inside `available`.
+     *
+     * Cells are laid out from the strip's left edge at a fixed width and gap, so
+     * the last one that fits ends where the cut belongs. Reading the real
+     * rectangles is what keeps that edge exact: the cell width is
+     * `calc(10ch + 6px)`, and `ch` resolves to a fraction, so reconstructing the
+     * edge from one measured cell and the gap landed a pixel or two short.
+     *
+     * The cap adds the strip's 4px right padding. A cell reserves 3ch for its
+     * unit, but glyph advance can exceed that box — "M/s" is about 1.6px wider in
+     * the UI font — and the clip edge is the strip's padding-box edge. Without
+     * the padding the tail reading's unit would be sliced even though the same
+     * unit renders whole in every other cell.
+     * @param element - the strip.
+     * @param cells - its `.smx-item` children, in visual order.
+     * @param available - width left for the strip on the row.
+     * @returns the cap in pixels; 0 when not even the first reading fits.
+     */
+    const EDGE_PADDING = 4
+
+    function snapToCells(element, cells, available) {
+      const origin = element.getBoundingClientRect().left
+      let edge = 0
+      for (const item of cells) {
+        const right = item.getBoundingClientRect().right - origin
+        if (right > available + 0.5) break
+        edge = right
+      }
+      return edge === 0 ? 0 : edge + EDGE_PADDING
+    }
+
     /** The nearest ancestor that declares itself an inline-size container. */
     function findContainer(element) {
       let node = element?.parentElement ?? null
@@ -568,24 +605,20 @@ window.__ModuleLoader__.load({
             report({ stage: 'no-container' })
             return
           }
-          // A partially visible reading looks broken, so drop the last cell when
-          // only a small part of it would show — but keep it when most of the
-          // cell is visible, otherwise a 2px shortfall would cost a whole reading.
-          // The first child is the injected <style>, so look the cell up by class.
-          const firstCell = typeof element.querySelector === 'function' ? element.querySelector('.smx-item') : null
-          const cell = firstCell === null ? 0 : firstCell.getBoundingClientRect().width
+          // A partially visible reading looks broken, so the cap snaps to the
+          // right edge of the last reading that fits, plus the strip's own right
+          // padding (see snapToCells) so the tail unit's glyph advance still has
+          // room to paint. Computing the edge from the real cell rectangles
+          // rather than arithmetic on the first cell's width keeps it exact:
+          // `width: calc(10ch + 6px)` resolves per cell, and the old
+          // `fit * (cell + gap) - gap` landed a pixel or two short — enough to
+          // slice the trailing `/s` of the last reading in half.
+          const cells = typeof element.querySelectorAll === 'function'
+            ? element.querySelectorAll('.smx-item')
+            : []
+          const cell = cells.length === 0 ? 0 : cells[0].getBoundingClientRect().width
           let limit = detail.available
-          const selfGap = Number.parseFloat(
-            typeof window.getComputedStyle === 'function' ? window.getComputedStyle(element).columnGap : '',
-          ) || 10
-          if (cell > 0) {
-            const unit = cell + selfGap
-            const fit = Math.floor((detail.available + selfGap) / unit)
-            const whole = fit > 0 ? fit * unit - selfGap : 0
-            const remainder = detail.available - whole
-            limit = fit > 0 && remainder < cell / 2 ? whole : Math.min(detail.available, Math.max(whole, 0))
-            if (fit === 0) limit = 0
-          }
+          if (cells.length !== 0) limit = snapToCells(element, cells, detail.available)
           // Sub-pixel noise would otherwise serialize a style different from the
           // value React renders later and cause pointless writes.
           limit = Math.round(limit * 100) / 100
